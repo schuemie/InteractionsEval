@@ -18,20 +18,6 @@ createCohorts <- function(connectionDetails,
                           cdmDatabaseSchema,
                           cohortDatabaseSchema,
                           cohortTable) {
-  # 69 = angioedema
-  cohortDefinitionSet <- bind_rows(
-    PhenotypeLibrary::getPlCohortDefinitionSet(69),
-    CohortGenerator::getCohortDefinitionSet(packageName = "InteractionsEval")
-  )
-  negativeControls <- readr::read_csv(
-    file = system.file("NegativeControls.csv", package = "InteractionsEval"),
-    show_col_types = FALSE
-  ) %>%
-    select(
-      cohortId = "outcomeId",
-      cohortName = "outcomeName",
-      outcomeConceptId = "outcomeId"
-    )
 
   connection <- DatabaseConnector::connect(connectionDetails)
   on.exit(DatabaseConnector::disconnect(connection))
@@ -42,6 +28,12 @@ createCohorts <- function(connectionDetails,
     cohortDatabaseSchema = cohortDatabaseSchema,
     cohortTableNames = cohortTableNames
   )
+  
+  # Exposure cohorts (from ATLAS) ----------------------------------------------
+  cohortDefinitionSet <- CohortGenerator::getCohortDefinitionSet(
+    settingsFileName = "Cohorts.csv",
+    packageName = "InteractionsEval"
+  )
   CohortGenerator::generateCohortSet(
     connection = connection,
     cdmDatabaseSchema = cdmDatabaseSchema,
@@ -49,6 +41,31 @@ createCohorts <- function(connectionDetails,
     cohortTableNames = cohortTableNames,
     cohortDefinitionSet = cohortDefinitionSet
   )
+  
+  # Outcome of interest cohort (from the Phenotype Library) --------------------
+  # 77 = GI Bleed
+  cohortDefinitionSet <- bind_rows(
+    PhenotypeLibrary::getPlCohortDefinitionSet(77),
+    CohortGenerator::getCohortDefinitionSet(packageName = "InteractionsEval")
+  )
+  CohortGenerator::generateCohortSet(
+    connection = connection,
+    cdmDatabaseSchema = cdmDatabaseSchema,
+    cohortDatabaseSchema = cohortDatabaseSchema,
+    cohortTableNames = cohortTableNames,
+    cohortDefinitionSet = cohortDefinitionSet
+  )
+  
+  # Negative controls ----------------------------------------------------------
+  negativeControls <- readr::read_csv(
+    file = system.file("NegativeControls.csv", package = "InteractionsEval"),
+    show_col_types = FALSE
+  ) %>%
+    select(
+      cohortId = "outcomeId",
+      cohortName = "outcomeName",
+      outcomeConceptId = "outcomeId"
+    )
   CohortGenerator::generateNegativeControlOutcomeCohorts(
     connection = connection,
     cdmDatabaseSchema = cdmDatabaseSchema,
@@ -56,6 +73,8 @@ createCohorts <- function(connectionDetails,
     cohortTable = cohortTable,
     negativeControlOutcomeCohortSet = negativeControls
   )
+  
+  # Count cohorts --------------------------------------------------------------
   cohortCounts <- CohortGenerator::getCohortCounts(
     connection = connection,
     cohortDatabaseSchema = cohortDatabaseSchema,

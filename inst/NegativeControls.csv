@@ -1,77 +1,35 @@
-targetId,targetName,comparatorId,comparatorName,outcomeId,outcomeName
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,134438,Contact dermatitis
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,141932,Senile hyperkeratosis
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,140648,Onychomycosis due to dermatophyte
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,374375,Impacted cerumen
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,378427,Tear film insufficiency
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,437264,Tobacco dependence syndrome
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,373478,Presbyopia
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,139099,Ingrowing nail
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,36713918,Somatic dysfunction of lumbar region
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,140641,Verruca vulgaris
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4115367,Wrist joint pain
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,194083,Vaginitis and vulvovaginitis
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4213540,Cervical somatic dysfunction
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,444132,Injury of knee
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,81151,Sprain of ankle
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,440329,Herpes zoster without complication
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,73560,Calcaneal spur
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,433577,Hammer toe
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,81378,Chondromalacia of patella
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,72748,Strain of rotator cuff capsule
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,75911,Acquired hallux valgus
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,441788,Human papilloma virus infection
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,136368,Non-toxic multinodular goiter
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,376707,Acute conjunctivitis
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,77965,Acquired trigger finger
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,137951,Acquired keratoderma
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,73241,Anal and rectal polyp
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4209423,Nicotine dependence
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,76786,Derangement of knee
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,78619,Contusion of knee
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,196168,Irregular periods
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4092896,Feces contents abnormal
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,380706,Regular astigmatism
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,195873,Leukorrhea
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4344500,Impingement syndrome of shoulder region
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4170770,Epidermoid cyst
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4103703,Melena
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4088290,Absence of breast
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,40480893,Nonspecific tuberculin test reaction
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4083487,Macular drusen
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,201606,Crohn's disease
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,433527,Endometriosis
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,434165,Abnormal cervical smear
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,140842,Changes in skin texture
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4201390,Colostomy present
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,439790,Psychalgia
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4092879,Absent kidney
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4012570,High risk sexual behavior
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4115402,Difficulty sleeping
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,438130,Opioid abuse
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,434327,Cannabis abuse
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,199192,Abrasion and/or friction burn of trunk without infection
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,44783954,Acid reflux
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,46269889,Complication due to Crohn's disease
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4166231,Genetic predisposition
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4201717,Ileostomy present
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4091513,Passing flatus
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,40481632,Ganglion cyst
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4231770,Hereditary thrombophilia
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,259995,Foreign body in orifice
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,432303,Cocaine abuse
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,46286594,Problem related to lifestyle
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,432593,Kwashiorkor
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4202045,Postviral fatigue syndrome
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,81634,Ptotic breast
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,377572,Noise effects on inner ear
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,436409,Abnormal pupil
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4012934,Homocystinuria
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,4103640,Amputated foot
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,433111,Effects of hunger
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,434203,Late effect of contusion
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,438329,Late effect of motor vehicle accident
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,45757370,Disproportion of reconstructed breast
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,133655,Burn of forearm
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,443172,"Splinter of face, without major open wound"
-1,ACE inhibitors,2,Thiazides or thiazide-like diuretics,440193,Wristdrop
+outcomeId,outcomeName
+199074,Acute pancreatitis
+433753,Alcohol abuse
+257007,Allergic rhinitis
+443800,Amenorrhea
+436665,Bipolar disorder
+4084966,Candida infection of genital region
+29735,Candidiasis of mouth
+314658,Cardiomegaly
+380094,Carpal tunnel syndrome
+255573,Chronic obstructive lung disease
+443617,Conduct disorder
+192367,Dysplasia of cervix
+134718,Hirsutism
+433811,Hydronephrosis
+438134,Hypersomnia
+24609,Hypoglycemia
+437784,Infectious mononucleosis
+139099,Ingrowing nail
+80004,Injury of hand
+440358,Lipoma (clinical)
+316084,Lymphadenitis
+436940,Metabolic syndrome X
+319843,Mitral valve disorder
+440374,Obsessive-compulsive disorder
+193739,Ovarian failure
+375292,Perforation of tympanic membrane
+321596,Peripheral venous insufficiency
+436676,Posttraumatic stress disorder
+194997,Prostatitis
+73754,Restless legs
+141932,Senile hyperkeratosis
+374366,Sensorineural hearing loss
+313459,Sleep apnea
+197236,Uterine leiomyoma
