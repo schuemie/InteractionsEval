@@ -1,14 +1,22 @@
 library(InteractionsEval)
 
-options(andromedaTempFolder = "d:/andromedaTemp")
-maxCores <- parallel::detectCores()
+maxCores <- max(24, parallel::detectCores())
 
+source("extras/DatabaseDetails.R")
 
-connectionDetails <- DatabaseConnector::createConnectionDetails(dbms = "redshift",
-                                                                connectionString = keyring::key_get("redShiftConnectionStringMdcd"),
-                                                                user = keyring::key_get("redShiftUserName"),
-                                                                password = keyring::key_get("redShiftPassword"))
-cdmDatabaseSchema <- "cdm"
-cohortDatabaseSchema <- "scratch_mschuemi2"
-cohortTable <- "interactions_eval_mdcd"
-outputFolder <- "d:/InteractionsEval_MDCD"
+for (i in 2:length(databases)) {
+  database <- databases[[i]]
+  message(sprintf("***** Running on %s *****", database$databaseId))
+  execute(
+    connectionDetails = database$connectionDetails,
+    cdmDatabaseSchema = database$cdmDatabaseSchema,
+    cohortDatabaseSchema = database$cohortDatabaseSchema,
+    cohortTable = database$cohortTable,
+    verifyDependencies = TRUE,
+    outputFolder = database$outputFolder,
+    databaseId = database$databaseId,
+    createCohorts = TRUE,
+    runCohortMethod = TRUE,
+    maxCores = maxCores
+  )
+}

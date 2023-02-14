@@ -1,4 +1,4 @@
-# Copyright 2022 Observational Health Data Sciences and Informatics
+# Copyright 2023 Observational Health Data Sciences and Informatics
 #
 # This file is part of InteractionsEval
 # 
@@ -26,11 +26,15 @@ shell("R CMD Rd2pdf ./ --output=extras/InteractionsEval.pdf")
 
 # Insert cohort definitions from ATLAS into package -----------------------
 remotes::install_github("ohdsi/ROhdsiWebApi")
-ROhdsiWebApi::authorizeWebApi(baseUrl = Sys.getenv("baseUrl"),
-                              authMethod = "windows")
-ROhdsiWebApi::insertCohortDefinitionSetInPackage(fileName = "inst/Cohorts.csv",
-                                                 baseUrl = Sys.getenv("baseUrl"),
-                                                 insertTableSql = FALSE,
-                                                 insertCohortCreationR = FALSE,
-                                                 generateStats = FALSE,
-                                                 packageName = "InteractionsEval")
+ROhdsiWebApi::authorizeWebApi(
+  baseUrl = Sys.getenv("baseUrl"),
+  authMethod = "windows"
+)
+ROhdsiWebApi::insertCohortDefinitionSetInPackage(
+  fileName = "inst/Cohorts.csv",
+  baseUrl = Sys.getenv("baseUrl"),
+  insertTableSql = FALSE,
+  insertCohortCreationR = FALSE,
+  generateStats = FALSE,
+  packageName = "InteractionsEval"
+)

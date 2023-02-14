@@ -1,0 +1,303 @@
+SimulateData<- function(N,pi,MaleFraction,TreatedFraction,eta,gammaMean,gammaVar){
+  siteIDx <- rmultinom(N,1,pi)
+  siteID <- max.col(t(siteIDx),"first")
+  
+  Male <- rbinom(N,1,MaleFraction)
+  Treatment <- rbinom(N,1,TreatedFraction)
+  period <- ceiling(rexp(N,0.5))
+  #period <- rep(2,N)
+  X <- cbind(Treatment*(1-Male),Treatment*Male,rep(1,N),Male) # first two are parameter of interest (denoted as eta); last two gamma
+  colnames(X) <- c("x1", "x2","z1","z2")
+  
+  J <- length(pi)
+  gamma <-matrix(NA,nrow = J,ncol=2)
+  theta <-matrix(NA,nrow = J,ncol=4)
+  
+  y <- rep(NA,N)
+  for (j in 1:J){
+    nj <- sum(siteID==j)
+    gamma[j,1]<- rnorm(1,gammaMean[1],gammaVar[1])
+    gamma[j,2]<- rnorm(1,gammaMean[2],gammaVar[2])
+    theta[j,] <- c(eta,gamma[j,])
+    mu_j <- exp(X[siteID==j,]%*%theta[j,])
+    period_j <- period[siteID==j]
+    yj <- rpois(nj, lambda=mu_j*period_j)
+    y[siteID==j]=yj
+  }
+  ppdata <- data.frame(y,X,period,siteID)
+  return(ppdata)
+}
+
+# Pooled analysis
+nlogLp_pool <- function(eta,ppdata){
+  Lp<-rep(0)
+  J<- max(ppdata$siteID)
+  for (j in 1:J){
+    ipdata <- ppdata[ppdata$siteID==j,]
+    nlogLp <- function(eta){
+      eta0<-eta
+      X <- as.matrix(ipdata[,2:5])
+      y <- c(ipdata[,1])
+      period <- ipdata$period
+      fit_j<-glm(y ~ -1+X[,3]+X[,4], offset = X[,1:2]%*%eta0+log(period),  family = poisson(link = log))
+      gamma_fit<-fit_j$coefficients
+      nlogLp <- -sum(y*(X%*%c(eta0,gamma_fit)+log(period))-period*c(exp(X%*%c(eta0,gamma_fit))))
+      return(nlogLp)
+    }
+    Lp <- nlogLp(eta)+Lp
+    #print(nlogLp(eta))
+  }
+  return(Lp)
+}
+estimatePool<- function(ppdata){
+  eta.pool <- optim(c(1,1),nlogLp_pool,ppdata = ppdata)$par
+  return(list(est = c(eta.pool)))
+}
+
+# Meta analysis
+fit.bar <- function(ppdata,siteID){  ## use glm
+  J<- max(ppdata$siteID)
+  ehat <- matrix(NA,nrow = J,ncol=2)
+  Vhat <-array(NA,c(J,2,2))
+  for (j in 1:J){
+    ipdata <- ppdata[ppdata$siteID==j,]
+    X <- as.matrix(ipdata[,2:5])
+    y <- c(ipdata[,1])
+    period <- ipdata$period
+    fit_j<-glm(y ~ -1+X[,1]+X[,2]+X[,3]+X[,4], offset = log(period), family = poisson(link = log))
+    ehat[j,] = fit_j$coefficients[1:2]
+    Vhat[j,,] = vcov(fit_j)[1:2,1:2]
+  }
+  return(list(ehat=ehat,Vhat=Vhat))
+}
+
+
+estimateMeta <- function(ppdata){
+  fit.local<-fit.bar(ppdata,siteID)
+  # remove studies with null
+  ValidSite<-which(rowSums(is.na(fit.local$ehat))==0)
+  eta.local<- fit.local$ehat[ValidSite,]
+  vcov.local <- fit.local$Vhat[ValidSite,,]
+  eMeta <- rep(0)
+  wtMeta <- matrix(0,2,2)
+  for(j in 1:length(ValidSite)){
+    eMeta<- eMeta+solve(vcov.local[j,,])%*%eta.local[j,]
+    wtMeta<- wtMeta+solve(vcov.local[j,,])
+  }
+  eMeta <- solve(wtMeta)%*%eMeta
+  vMeta<- solve(wtMeta)
+  
+  return(list(est = c(eMeta),cov = vMeta))
+}
+
+## Pade
+
+logLp_deriv <- function(ipdata,theta){
+  y <- ipdata[,1]
+  x1 <-ipdata[,2]; x2<-ipdata[,3];x3<-ipdata[,4]; x4<-ipdata[,5]
+  period <- ipdata[,6]
+  X <- cbind(x1,x2,x3,x4)
+  eXt <- c(exp(X%*%theta))*period
+  L01 <- colSums((y-eXt)*cbind(x3,x4))
+  L02 <- -colSums(eXt*cbind(x3*x3,x3*x4,x4*x3,x4*x4))
+  invL02 <- solve(matrix(L02,nrow=2,ncol=2))
+  L11_e1 <- -colSums(eXt*cbind(x3*x1,x4*x1))
+  L11_e2 <- -colSums(eXt*cbind(x3*x2,x4*x2))
+  D1_e1 <- -invL02%*%L11_e1
+  D1_e2 <- -invL02%*%L11_e2
+  
+  
+  W1 <- cbind(x3,x4)%*%D1_e1
+  W2 <- cbind(x3,x4)%*%D1_e2
+  b11 <- -colSums(c(eXt*(x1+W1)^2)*cbind(x3,x4))
+  D2_e11 <- -invL02%*%b11
+  b12 <- -colSums(c(eXt*(x1+W1)*(x2+W2))*cbind(x3,x4))
+  D2_e12 <- -invL02%*%b12
+  D2_e21 <- D2_e12
+  b22 <- -colSums(c(eXt*(x2+W2)^2)*cbind(x3,x4))
+  D2_e22 <- -invL02%*%b22
+  
+  W11 <- cbind(x3,x4)%*%D2_e11
+  W12 <- cbind(x3,x4)%*%D2_e12
+  W21 <- cbind(x3,x4)%*%D2_e21
+  W22 <- cbind(x3,x4)%*%D2_e22
+  b111 <- -colSums(c(eXt*((x1+W1)^3+3*(x1+W1)*W11))*cbind(x3,x4))
+  D3_e111 <- -invL02%*%b111
+  b112 <- -colSums(c(eXt*((x2+W2)*(x1+W1)^2+(x2+W2)*W11+2*(x1+W1)*W12))*cbind(x3,x4))
+  D3_e112 <- -invL02%*%b112
+  b122 <- -colSums(c(eXt*((x2+W2)^2*(x1+W1)+2*(x2+W2)*W12+(x1+W1)*W22))*cbind(x3,x4))
+  D3_e122 <- -invL02%*%b122
+  b222 <- -colSums(c(eXt*((x2+W2)^3+3*(x2+W2)*W22))*cbind(x3,x4))
+  D3_e222 <- -invL02%*%b222
+  
+  logL <- sum(y*(X%*%theta+log(period))-eXt)
+  logL_D1 <- c(sum((y-eXt)*(x1+W1)),sum((y-eXt)*(x2+W2)))
+  logL_D2_11 <- sum(-eXt*(x1+W1)^2+(y-eXt)*W11)
+  logL_D2_12 <- sum(-eXt*(x2+W2)*(x1+W1)+(y-eXt)*W12)
+  logL_D2_22 <- sum(-eXt*(x2+W2)^2+(y-eXt)*W22)
+  logL_D2 <- matrix(c(logL_D2_11,logL_D2_12,logL_D2_12,logL_D2_22),nrow=2,ncol=2)
+  
+  W111 <- cbind(x3,x4)%*%D3_e111
+  W112 <- cbind(x3,x4)%*%D3_e112
+  W122 <- cbind(x3,x4)%*%D3_e122
+  W222 <- cbind(x3,x4)%*%D3_e222
+  logL_D3_111 <- sum(-eXt*((x1+W1)^3+3*(x1+W1)*W11)+(y-eXt)*W111)
+  logL_D3_112 <- sum(-eXt*((x1+W1)^2*(x2+W2)+2*(x1+W1)*W12+(x2+W2)*W11)+(y-eXt)*W112)
+  logL_D3_122 <- sum(-eXt*((x1+W1)*(x2+W2)^2+2*(x2+W2)*W12+(x1+W1)*W22)+(y-eXt)*W122)
+  logL_D3_222 <- sum(-eXt*((x2+W2)^3+3*(x2+W2)*W22)+(y-eXt)*W222)
+  
+  
+  return(list(logLp=logL,logLp_D1=logL_D1,logLp_D2=logL_D2,logLp_D3=c(logL_D3_111,logL_D3_222,logL_D3_112,logL_D3_122)))
+}
+
+GetLocalDeriv <- function(ebar,ipdata){
+  fit_j<-glm(ipdata[,1] ~ -1+ipdata[,4]+ipdata[,5], offset = ipdata[,2:3]%*%ebar+log(ipdata[,6]),  family = poisson(link = log))
+  gfit_ebar<-fit_j$coefficients
+  thetaj <- c(ebar,gfit_ebar)
+  logLp_deriv_j<-logLp_deriv(ipdata,thetaj)
+  return(logLp_deriv_j)
+}
+
+GetGlobalDeriv <- function(ebar,ppdata){
+  J<- max(ppdata$siteID)
+  logLp <- 0
+  logLp_D1 <- rep(0,2)
+  logLp_D2 <- matrix(0,2,2)
+  logLp_D3 <- rep(0,4)
+  for (j in 1:J){
+    ipdata <- as.matrix(ppdata[ppdata$siteID==j,])
+    logLp_deriv_j<-GetLocalDeriv(ebar,ipdata)
+    logLp <- logLp_deriv_j$logLp+logLp
+    logLp_D1 <- logLp_deriv_j$logLp_D1+logLp_D1
+    logLp_D2 <- logLp_deriv_j$logLp_D2+logLp_D2
+    logLp_D3 <- logLp_deriv_j$logLp_D3+logLp_D3
+  }
+  return(list(logLp=logLp,logLp_D1=logLp_D1,logLp_D2=logLp_D2,logLp_D3=logLp_D3))
+}
+
+EstPadeCoef<- function(deriv,Midx = rbind(c(0,0),c(1,0),c(0,1),c(1,1),c(2,0),c(0,2)),
+                       Nidx = rbind(c(0,0),c(1,0),c(0,1),c(1,1),c(2,0),c(0,2)),
+                       Eidx = rbind(Midx,c(3,0),c(0,3))){
+  c0 <- deriv$logLp
+  c1 <- deriv$logLp_D1
+  c2 <- deriv$logLp_D2/2
+  Esub_idx<-Eidx[c((dim(Midx)[1]+1):(dim(Eidx)[1])),]
+  Esub_N<-array(0,c(dim(Esub_idx),dim(Nidx)[1]-1))
+  
+  A <- matrix(0,dim(Esub_idx)[1],(dim(Nidx)[1]-1))
+  for(i in 1:dim(Esub_idx)[1]){
+    for(j in 1:(dim(Nidx)[1]-1)){
+      EN_idx <- Esub_idx[i,]-Nidx[j+1,]
+      if(min(EN_idx)<0) A[i,j]=0
+      else if (sum(EN_idx)==0) A[i,j]<-c0
+      else if (sum(EN_idx)==1) A[i,j]<-c1[which(EN_idx==1)]
+      else if (any(EN_idx==2)) A[i,j]<-c2[which(EN_idx==2),which(EN_idx==2)]
+      else{
+        idx2 <- which(EN_idx==1)
+        A[i,j]<-2*c2[idx2[1],idx2[2]]
+      }
+    }
+  }
+  
+  A2 = matrix(0,dim(Midx)[1],dim(Nidx)[1])
+  for(i in 1:dim(Midx)[1]){
+    for(j in 1:(dim(Nidx)[1])){
+      MN_idx <- Midx[i,]-Nidx[j,]
+      if(min(MN_idx)<0) A2[i,j]=0
+      else if (sum(MN_idx)==0) A2[i,j]=c0
+      else if (sum(MN_idx)==1) A2[i,j]=c1[which(MN_idx==1)]
+      else if (any(MN_idx==2)) A2[i,j]=c2[which(MN_idx==2),which(MN_idx==2)]
+      else{
+        idx2 <- which(MN_idx==1)
+        A2[i,j]=2*c2[idx2[1],idx2[2]]
+      }
+    }
+  }
+  A00 <- c(deriv$logLp_D3[1:2]/6)
+  A <- cbind(A00,A)
+  
+  A_decomp <- eigen(t(A)%*%A)
+  min_idx <- which(abs(A_decomp$vectors[1,])>1e-4 & abs(A_decomp$values)<1e-8)
+  min_idx <- min_idx[which.min(abs(A_decomp$values[min_idx]))]
+  vv<- A_decomp$vectors[,min_idx]
+  
+  vvQ<-vv
+  vvP <- A2%*%vvQ
+  return(list(Pcoef = c(vvP),Qcoef = c(vvQ)))
+}
+
+PadeEstCR<- function(ebar,PadeCoef,alpha=0.05){
+  num_vec<-c(PadeCoef$Pcoef)
+  denom_vec<-c(PadeCoef$Qcoef)
+  Pade<-function(eta){ # pade function to approximate negative log-likelihood
+    x <- eta-ebar
+    terms <- c(1,x,x[1]*x[2],x^2)
+    Pm<- sum(terms*num_vec)
+    Qn <- sum(terms*denom_vec)
+    pade <- -Pm/Qn
+    return(pade)
+  }
+  eta.pade<-optim(ebar,Pade,method = "L-BFGS-B",
+                  lower = ebar-log(10), upper = ebar+log(10))
+  PadeEst <- eta.pade$par
+  
+  # CR
+  coef.CR<-num_vec-denom_vec*c(-eta.pade$value-qchisq(1-alpha,2)/2)
+  
+  return(list(Est=PadeEst,CR=coef.CR))
+}
+
+
+## function to plot CR
+
+ellipse.plot.meta <- function(mua, mub, sa, sb, rho, n = NULL, alpha=0.05){
+  pi <- 3.14159265359
+  tt<-seq(0, 2*pi, length=1000)
+  #CC<-sqrt(qchisq(1-alpha, 2))
+  #CC<-sqrt(2*qf(1-alpha, 2, n-2))
+  CC <- qnorm(1-alpha/2)
+  ua <<- mua + sa*CC*cos(tt)
+  ub <<- mub + sb*CC*cos(tt+acos(rho))
+  return(data.frame(x = ua,y = ub))
+}
+ellipse.plot.pade <- function(coef, ebar){
+  
+  A = coef[5]
+  C = coef[6]
+  B = coef[4]
+  D = coef[2]
+  E = coef[3]
+  FF =coef[1]
+  pi <- 3.14159265359
+  M0 <- matrix(c(FF, D/2, E/2, D/2, A, B/2, E/2, B/2, C), 3L,
+               3L)
+  M <- matrix(c(A, B/2, B/2, C), 2L, 2L)
+  lambda <- eigen(M, symmetric = TRUE)$values
+  detM0 <- det(M0)
+  detM <- det(M)
+  if(abs(lambda[1] - A) < abs(lambda[1] - C)){
+    a <- sqrt(-det(M0)/(det(M)*lambda[1]))
+    b <- sqrt(-det(M0)/(det(M)*lambda[2]))
+  }else{
+    a <- sqrt(-det(M0)/(det(M)*lambda[2]))
+    b <- sqrt(-det(M0)/(det(M)*lambda[1]))
+  }
+  x <- B * E - 2 * C * D
+  y <- B * D - 2 * A * E
+  
+  phi <- if (is.nan(B/(A - C))) {
+    0
+  }else {
+    if (abs(C) > abs(A))
+      atan(B/(A - C))/2
+    else (pi/2 - atan(-B/(A - C))/2)
+  }
+  xc <- x/(4 * A * C - B * B)
+  yc <- y/(4 * A * C - B * B)
+  
+  
+  t <- seq(0, 2*pi, length = 1000)
+  x <- xc + a*cos(t)*cos(phi) - b*sin(t)*sin(phi)
+  y <- yc + a*cos(t)*sin(phi) + b*sin(t)*cos(phi)
+  return(data.frame(x = x+ebar[1],y = y+ebar[2]))
+}

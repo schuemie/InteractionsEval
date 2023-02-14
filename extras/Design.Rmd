@@ -1,0 +1,73 @@
+---
+title: "Evaluation of methods for synthesizing interaction effect estimates"
+author: "Martijn Schuemie, Yong Chen"
+date: "`r Sys.Date()`"
+output: 
+  word_document: 
+    toc: yes
+    number_sections: yes
+---
+
+```{r setup, include=FALSE,warning=FALSE}
+library(dplyr)
+library(knitr)
+
+source("PrintCohortDefinitions.R")
+
+```
+
+# Introduction
+
+
+
+# Data sources
+
+The DatabaseDiagnostics package was used to select those databases that appear to have the elements needed for the example estimation questions:
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, cache=TRUE, results="asis"}
+source("DatabaseDetails.R")
+output <- c()
+for (i in seq_along(databases)) {
+  database <- databases[[i]]
+  connection <- DatabaseConnector::connect(database$connectionDetails)
+  row <- DatabaseConnector::renderTranslateQuerySql(
+    connection = connection, 
+    sql = "SELECT TOP 1 * FROM @cdm_database_schema.cdm_source;",
+    cdm_database_schema = database$cdmDatabaseSchema,
+    snakeCaseToCamelCase = TRUE
+  )
+  output[i] <- sprintf("\n## %s\n\n %s\n", row$cdmSourceName, row$sourceDescription)
+  DatabaseConnector::disconnect(connection)
+}
+writeLines(output)
+```
+
+
+
+# Appendix A: Cohort Definitions
+
+```{r echo=FALSE, results="asis", warning=FALSE, message=FALSE}
+json <- SqlRender::readSql(system.file("cohorts", "11037.json", package = "InteractionsEval"))
+printCohortDefinitionFromNameAndJson("Target", json)
+```
+
+```{r echo=FALSE, results="asis", warning=FALSE, message=FALSE}
+json <- SqlRender::readSql(system.file("cohorts", "11038.json", package = "InteractionsEval"))
+printCohortDefinitionFromNameAndJson("Comparator", json)
+```
+
+```{r echo=FALSE, results="asis", warning=FALSE, message=FALSE}
+json <- PhenotypeLibrary::getPlCohortDefinitionSet(77)$json
+printCohortDefinitionFromNameAndJson("Outcome", json)
+```
+
+# Appendix B: Negative controls
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+readr::read_csv(
+    file = system.file("NegativeControls.csv", package = "InteractionsEval"),
+    show_col_types = FALSE
+  ) %>%
+  arrange(outcomeName) %>%
+  kable(linesep = "", booktabs = TRUE, longtable = TRUE)
+```
+

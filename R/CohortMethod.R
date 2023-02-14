@@ -1,4 +1,4 @@
-# Copyright 2022 Observational Health Data Sciences and Informatics
+# Copyright 2023 Observational Health Data Sciences and Informatics
 #
 # This file is part of InteractionsEval
 #
@@ -22,7 +22,7 @@ runCohortMethod <- function(connectionDetails,
                             maxCores) {
   # Create settings ------------------------------------------------------------
   outcomeOfInterest <- CohortMethod::createOutcome(
-    outcomeId = 69,
+    outcomeId = 77,
     outcomeOfInterest = TRUE
   )
   negativeControls <- readr::read_csv(
@@ -41,8 +41,8 @@ runCohortMethod <- function(connectionDetails,
   )
 
   tcos <- CohortMethod::createTargetComparatorOutcomes(
-    targetId = 1,
-    comparatorId = 2,
+    targetId = 11038,
+    comparatorId = 11037,
     outcomes = append(
       list(outcomeOfInterest),
       negativeControlOutcomes
@@ -50,7 +50,7 @@ runCohortMethod <- function(connectionDetails,
   )
   targetComparatorOutcomesList <- list(tcos)
 
-  conceptIdsToExclude <- c(1335471, 1340128, 1341927, 1363749, 1308216, 1310756, 1373225, 1331235, 1334456, 1342439, 1395058, 974166, 978555, 907013)
+  conceptIdsToExclude <- 21603933 # NSAIDs
 
   covarSettings <- FeatureExtraction::createDefaultCovariateSettings(
     excludedCovariateConceptIds = conceptIdsToExclude,
@@ -65,14 +65,15 @@ runCohortMethod <- function(connectionDetails,
     covariateSettings = covarSettings
   )
 
-  createStudyPopArgsAcuteTar <- CohortMethod::createCreateStudyPopulationArgs(
+  createStudyPopArgsOnTreatment <- CohortMethod::createCreateStudyPopulationArgs(
     removeSubjectsWithPriorOutcome = TRUE,
-    removeDuplicateSubjects = "remove all",
+    removeDuplicateSubjects = "keep first",
     minDaysAtRisk = 1,
     riskWindowStart = 0,
     startAnchor = "cohort start",
-    riskWindowEnd = 7,
-    endAnchor = "cohort start"
+    riskWindowEnd = 0,
+    endAnchor = "cohort end",
+    censorAtNewRiskWindow = TRUE
   )
 
   createPsArgs <- CohortMethod::createCreatePsArgs(
@@ -90,30 +91,20 @@ runCohortMethod <- function(connectionDetails,
 
   computeSharedCovBalArgs <- CohortMethod::createComputeCovariateBalanceArgs()
 
-  fitOutcomeModelArgsLr <- CohortMethod::createFitOutcomeModelArgs(
-    modelType = "logistic",
+  fitOutcomeModelArgsPoisson <- CohortMethod::createFitOutcomeModelArgs(
+    modelType = "poisson",
     stratified = TRUE
   )
 
   cmAnalysis1 <- CohortMethod::createCmAnalysis(
     analysisId = 1,
-    description = "Logistic regression, TAR = 0-7",
+    description = "Poisson regression",
     getDbCohortMethodDataArgs = getDbCmDataArgs,
-    createStudyPopArgs = createStudyPopArgsAcuteTar,
+    createStudyPopArgs = createStudyPopArgsOnTreatment,
     createPsArgs = createPsArgs,
     stratifyByPsArgs = stratifyByPsArgs,
     computeSharedCovariateBalanceArgs = computeSharedCovBalArgs,
-    fitOutcomeModelArgs = fitOutcomeModelArgsLr
-  )
-
-  createStudyPopArgsOnTreatment <- CohortMethod::createCreateStudyPopulationArgs(
-    removeSubjectsWithPriorOutcome = TRUE,
-    removeDuplicateSubjects = "remove all",
-    minDaysAtRisk = 1,
-    riskWindowStart = 0,
-    startAnchor = "cohort start",
-    riskWindowEnd = 0,
-    endAnchor = "cohort end"
+    fitOutcomeModelArgs = fitOutcomeModelArgsPoisson
   )
 
   fitOutcomeModelArgsCox <- CohortMethod::createFitOutcomeModelArgs(
@@ -123,7 +114,7 @@ runCohortMethod <- function(connectionDetails,
 
   cmAnalysis2 <- CohortMethod::createCmAnalysis(
     analysisId = 2,
-    description = "Cox regression, TAR = on treatment",
+    description = "Cox regression",
     getDbCohortMethodDataArgs = getDbCmDataArgs,
     createStudyPopArgs = createStudyPopArgsOnTreatment,
     createPsArgs = createPsArgs,
@@ -133,34 +124,34 @@ runCohortMethod <- function(connectionDetails,
   )
 
 
-  black <- 8516004
+  warfarinDrugEraOverlap <- 1310149413
 
-  fitOutcomeModelArgsLrInteraction <- CohortMethod::createFitOutcomeModelArgs(
-    modelType = "logistic",
+  fitOutcomeModelArgsPoissonInteraction <- CohortMethod::createFitOutcomeModelArgs(
+    modelType = "poisson",
     stratified = TRUE,
-    interactionCovariateIds = black
+    interactionCovariateIds = warfarinDrugEraOverlap
   )
 
   fitOutcomeModelArgsCoxInteraction <- CohortMethod::createFitOutcomeModelArgs(
     modelType = "cox",
     stratified = TRUE,
-    interactionCovariateIds = black
+    interactionCovariateIds = warfarinDrugEraOverlap
   )
 
   cmAnalysis3 <- CohortMethod::createCmAnalysis(
     analysisId = 3,
-    description = "Logistic regression, TAR = 0-7, interaction",
+    description = "Poisson regression",
     getDbCohortMethodDataArgs = getDbCmDataArgs,
-    createStudyPopArgs = createStudyPopArgsAcuteTar,
+    createStudyPopArgs = createStudyPopArgsOnTreatment,
     createPsArgs = createPsArgs,
     stratifyByPsArgs = stratifyByPsArgs,
     computeSharedCovariateBalanceArgs = computeSharedCovBalArgs,
-    fitOutcomeModelArgs = fitOutcomeModelArgsLrInteraction
+    fitOutcomeModelArgs = fitOutcomeModelArgsPoissonInteraction
   )
 
   cmAnalysis4 <- CohortMethod::createCmAnalysis(
     analysisId = 4,
-    description = "Cox regression, TAR = on treatment, interaction",
+    description = "Cox regression",
     getDbCohortMethodDataArgs = getDbCmDataArgs,
     createStudyPopArgs = createStudyPopArgsOnTreatment,
     createPsArgs = createPsArgs,
@@ -169,6 +160,7 @@ runCohortMethod <- function(connectionDetails,
     fitOutcomeModelArgs = fitOutcomeModelArgsCoxInteraction
   )
   cmAnalysisList <- list(cmAnalysis1, cmAnalysis2, cmAnalysis3, cmAnalysis4)
+  # cmAnalysisList <- list(cmAnalysis2, cmAnalysis4)
 
   CohortMethod::saveCmAnalysisList(cmAnalysisList, file.path(outputFolder, "cmAnalysisList.json"))
   CohortMethod::saveTargetComparatorOutcomesList(targetComparatorOutcomesList, file.path(outputFolder, "targetComparatorOutcomesList.json"))
@@ -177,7 +169,6 @@ runCohortMethod <- function(connectionDetails,
   cmAnalysisList <- CohortMethod::loadCmAnalysisList(file.path(outputFolder, "cmAnalysisList.json"))
   targetComparatorOutcomesList <- CohortMethod::loadTargetComparatorOutcomesList(file.path(outputFolder, "targetComparatorOutcomesList.json"))
   multiThreadingSettings <- CohortMethod::createDefaultMultiThreadingSettings(maxCores)
-
   result <- CohortMethod::runCmAnalyses(
     connectionDetails = connectionDetails,
     cdmDatabaseSchema = cdmDatabaseSchema,

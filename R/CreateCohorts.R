@@ -1,4 +1,4 @@
-# Copyright 2022 Observational Health Data Sciences and Informatics
+# Copyright 2023 Observational Health Data Sciences and Informatics
 #
 # This file is part of InteractionsEval
 #
@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# library(dplyr)
+
 createCohorts <- function(connectionDetails,
                           cdmDatabaseSchema,
                           cohortDatabaseSchema,
-                          cohortTable) {
+                          cohortTable,
+                          outputFolder) {
 
   connection <- DatabaseConnector::connect(connectionDetails)
   on.exit(DatabaseConnector::disconnect(connection))
@@ -30,7 +33,7 @@ createCohorts <- function(connectionDetails,
   )
   
   # Exposure cohorts (from ATLAS) ----------------------------------------------
-  cohortDefinitionSet <- CohortGenerator::getCohortDefinitionSet(
+  cohortDefinitionSet1 <- CohortGenerator::getCohortDefinitionSet(
     settingsFileName = "Cohorts.csv",
     packageName = "InteractionsEval"
   )
@@ -39,21 +42,18 @@ createCohorts <- function(connectionDetails,
     cdmDatabaseSchema = cdmDatabaseSchema,
     cohortDatabaseSchema = cohortDatabaseSchema,
     cohortTableNames = cohortTableNames,
-    cohortDefinitionSet = cohortDefinitionSet
+    cohortDefinitionSet = cohortDefinitionSet1
   )
   
   # Outcome of interest cohort (from the Phenotype Library) --------------------
   # 77 = GI Bleed
-  cohortDefinitionSet <- bind_rows(
-    PhenotypeLibrary::getPlCohortDefinitionSet(77),
-    CohortGenerator::getCohortDefinitionSet(packageName = "InteractionsEval")
-  )
+  cohortDefinitionSet2 <- PhenotypeLibrary::getPlCohortDefinitionSet(77)
   CohortGenerator::generateCohortSet(
     connection = connection,
     cdmDatabaseSchema = cdmDatabaseSchema,
     cohortDatabaseSchema = cohortDatabaseSchema,
     cohortTableNames = cohortTableNames,
-    cohortDefinitionSet = cohortDefinitionSet
+    cohortDefinitionSet = cohortDefinitionSet2
   )
   
   # Negative controls ----------------------------------------------------------
@@ -71,6 +71,7 @@ createCohorts <- function(connectionDetails,
     cdmDatabaseSchema = cdmDatabaseSchema,
     cohortDatabaseSchema = cohortDatabaseSchema,
     cohortTable = cohortTable,
+    occurrenceType = "first",
     negativeControlOutcomeCohortSet = negativeControls
   )
   
@@ -83,7 +84,9 @@ createCohorts <- function(connectionDetails,
   cohortCounts <- cohortCounts %>%
     inner_join(
       bind_rows(
-        cohortDefinitionSet %>%
+        cohortDefinitionSet1 %>%
+          select("cohortId", "cohortName"),
+        cohortDefinitionSet2 %>%
           select("cohortId", "cohortName"),
         negativeControls %>%
           select("cohortId", "cohortName")
