@@ -6,6 +6,7 @@ output:
   word_document: 
     toc: yes
     number_sections: yes
+bibliography: Design.bib
 ---
 
 ```{r setup, include=FALSE,warning=FALSE}
@@ -18,6 +19,54 @@ source("PrintCohortDefinitions.R")
 
 # Introduction
 
+There are several challenges when estimating causal effects across a distributed (federated) research network:
+
+1. Sharing of individual patient data (IPD) is not allowed.
+2. The nature of the data gathering process leads to censored observation periods that require a time-to-event analysis rather than simpler incidence rate estimation. 
+3. Due to the observational nature of the data and the consequent potential for confounding, some correction for baseline differences between exposure groups always proves necessary, typically via stratifying, matching, or weighting by a propensity score or disease risk score.
+4. Since different data sites represent different patient populations, inter-site heterogeneity often arises. 
+5. Even though many of these health care databases contain the records of large numbers of patients, co-occurrences of even moderately rare exposures and/or outcomes often prove to be sparse to non-existent.
+
+In our prior work [@schuemie_2022] we proposed to solve this problem by sharing likelihood profiles between sites; Instead of sharing the point estimates and standard errors (which imply the likelihood follows a normal distribution), sites would share the shape of the likelihood curve. Our result shows that, when counts are low (as often happens as mentioned under 5), our approach provides unbiased estimates. In contrast, using a normal approximation can lead to substantial bias.
+
+Here we aim to extend our work to situations where there is more than one parameter of interest. Specifically, we are interested in the synthesis of evidence on interactions between two exposures. Our prior work applied to single parameters of interest (e.g. the main effect), but often we want to know both the main effect and some interaction effect (e.g. is the causal effect larger in some subgroup of interest?).
+
+The research described here aims to completed extensive simulation studies by testing several approaches to likelihood profiling for effect interactions in a real worl setting.
+
+
+# Example interaction effect study
+
+To evaluate the use of likelihood profiles when synthesizing evidence on interaction effects, we will use the following example: non-selective nonsteroidal anti-inflammatory drugs (NSAIDs) are known to increase the risk of gastrointestinal (GI) bleeding, and this risk is known to increase when the patient is also on an oral anticoagulant such as warfarin. [@choi_2010]
+
+We therefore formulate an example comparative cohort study as follows:
+
+- **Target**: New users of diclofenac (a non-selective NSAID)
+- **Comparator**: New users of celecoxib (a selective COX-2 inhibitor NSAID)
+- **Outcome**: GI bleed
+- **Interaction term**: Warfarin exposure at the time of NSAID initiation
+- **Time at risk**: On-treatment: starting on the day of treatment initiation, ending when treatment is stopped (for at least 30 days).
+- **Model**: Either Cox or Poisson regression
+
+Cohort definitions of the target, comparator, and outcome are provided in Appendix A. The outcome cohort definition was taken from the OHDSI Phenotype Library.
+
+Warfarin exposure is defined as a drug era overlapping with the target or comparator index date, having ingredient concept ID 1310149 (Warfarin).
+
+We will require at least 365 days of continuous observation prior to the index date.
+
+Large-scale propensity scores (PS) will be fitted using the standard set of features, including all drugs, conditions, procedures, measurements, and observations in the year prior to index date, as well as demographics. We will use the PS to stratify the population in 10 equally-sized strata.
+
+The cohort and comparator cohorts will be restricted to at most 100,000 subjects. If these cohorts are larger, a 100,000 random sample will be taken.
+
+A set of 34 negative control outcomes, outcomes believed to be caused by neither the target nor the comparator, has been defined. (See Appendix B). We assume that these controls are negative both for the main effect and the interaction effect.
+
+
+# Evaluation of evidence synthesis methods
+
+The example study will be executed across the databases described in the 'Data sources' section. Various approaches for likelihood profiling will be applied to produce summary estimates for the main effect and the interaction effect, both for the outcome of interest (GI bleed) as well as the negative control outcomes. 
+
+The summary estimates for GI bleed will be compared with the gold standard, produced by pooling the data (stratified by data source).
+
+The negative control summary estimates will be used to estimate residual systematic error.
 
 
 # Data sources
@@ -43,6 +92,9 @@ writeLines(output)
 ```
 
 
+# References
+
+<div id="refs"></div>
 
 # Appendix A: Cohort Definitions
 
@@ -70,4 +122,3 @@ readr::read_csv(
   arrange(outcomeName) %>%
   kable(linesep = "", booktabs = TRUE, longtable = TRUE)
 ```
-
