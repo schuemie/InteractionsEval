@@ -55,5 +55,51 @@ computeDiagnostics <- function(outputFolder) {
   )
   
   # Concurrent medication ------------------------------------------------------
-  cmData <- CohortMethod::loadCohortMethodData(file.path(outputFolder, fileReference$cohortMethodDataFile[1]))
+  # cmData <- CohortMethod::loadCohortMethodData(file.path(outputFolder, fileReference$cohortMethodDataFile[1]))
 }
+
+#' Create analysis dataset
+#'
+#' @param dataFolders A vector of folder names where the cohort method analyses have 
+#'                    been executed.
+#'
+#' @return 
+#' A tibble with one row per person, across all outcomes, analyses, and databases
+#' 
+#' @export
+createAnalysisDataSet <- function(dataFolders) {
+  data <- list()
+  for (i in seq_along(dataFolders)) {
+    dataFolder <- dataFolders[i]
+    message(sprintf("Collecting data from %s", dataFolder))
+    fileReference <- CohortMethod::getFileReference(dataFolder)
+    fileReference <- fileReference %>%
+      filter(analysisId %in% c(3, 4))
+    preFilteredCmData <- CohortMethod::loadCohortMethodData(file.path(dataFolder, fileReference$prefilteredCovariatesFile[1]))
+    interactionCov <- preFilteredCmData$covariates %>%
+      select("rowId", subgroup = "covariateValue") %>%
+      collect()
+    for (j in seq_len(nrow(fileReference))) {
+      strataPop <- readRDS(file.path(dataFolder, fileReference$strataFile[j]))
+      pop <- strataPop %>%
+        left_join(interactionCov, by = join_by(rowId)) %>%
+        mutate(subgroup = if_else(is.na(.data$subgroup), 0, .data$subgroup)) %>%
+        select(y = "outcomeCount", time = "timeAtRisk", "survivalTime", "treatment", "stratumId", "subgroup") %>%
+        mutate(
+          siteId = i,
+          analysisId = fileReference$analysisId[j],
+          outcomeId = fileReference$outcomeId[j]
+        )
+      data[[length(data)+ 1]] <- pop
+    }
+  }
+  data <- bind_rows(data)
+  negativeControls <- readr::read_csv(
+    file = system.file("NegativeControls.csv", package = "InteractionsEval"),
+    show_col_types = FALSE
+  )
+  data <- data %>%
+    mutate(negativeControl = .data$outcomeId %in% negativeControls$outcomeId)
+  return(data)
+}
+

@@ -34,7 +34,7 @@ runCohortMethod <- function(connectionDetails,
     function(outcomeId) {
       CohortMethod::createOutcome(
         outcomeId = outcomeId,
-        outcomeOfInterest = FALSE,
+        outcomeOfInterest = TRUE,
         trueEffectSize = 1
       )
     }

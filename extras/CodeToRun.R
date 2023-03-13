@@ -4,7 +4,7 @@ maxCores <- max(24, parallel::detectCores())
 
 source("extras/DatabaseDetails.R")
 
-for (i in 2:length(databases)) {
+for (i in 1:length(databases)) {
   database <- databases[[i]]
   message(sprintf("***** Running on %s *****", database$databaseId))
   execute(
@@ -15,8 +15,19 @@ for (i in 2:length(databases)) {
     verifyDependencies = TRUE,
     outputFolder = database$outputFolder,
     databaseId = database$databaseId,
-    createCohorts = TRUE,
+    createCohorts = F,
     runCohortMethod = TRUE,
     maxCores = maxCores
   )
 }
+
+
+for (i in 2:length(databases)) {
+  database <- databases[[i]]
+  message(sprintf("***** Computing diagnostics on %s *****", database$databaseId))
+  computeDiagnostics(database$outputFolder)
+}
+
+dataFolders <- sapply(databases, function(x) x$outputFolder)
+dataSet <- createAnalysisDataSet(dataFolders)
+saveRDS(dataSet, file.path(rootFolder, "DataSet.rds"))

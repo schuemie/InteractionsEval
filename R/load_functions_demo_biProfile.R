@@ -1,10 +1,19 @@
-SimulateData<- function(N,pi,MaleFraction,TreatedFraction,eta,gammaMean,gammaVar){
-  siteIDx <- rmultinom(N,1,pi)
-  siteID <- max.col(t(siteIDx),"first")
+
+SimulateData<- function(N,nSites,nStrata,MaleFraction,TreatedFraction,eta, prevalence = 0.2, followup = 2){
+  
+  pi <- runif(nSites*nStrata, 0.1,0.9)
+  pi <- pi/sum(pi)
+  # set nuisance parameters based on prevalence
+  gamma2 <- c(0,0.5) # mean and sd of second nuisance parameter
+  
+  SitestratumIDx <- rmultinom(N,1,pi)
+  SitestratumID <- max.col(t(SitestratumIDx),"first")
+  siteID <- ceiling(SitestratumID/nStrata)
+  stratumID <- SitestratumID-nStrata*(siteID-1)
   
   Male <- rbinom(N,1,MaleFraction)
   Treatment <- rbinom(N,1,TreatedFraction)
-  period <- ceiling(rexp(N,0.5))
+  period <- ceiling(rexp(N,1/followup))
   #period <- rep(2,N)
   X <- cbind(Treatment*(1-Male),Treatment*Male,rep(1,N),Male) # first two are parameter of interest (denoted as eta); last two gamma
   colnames(X) <- c("x1", "x2","z1","z2")
@@ -16,24 +25,26 @@ SimulateData<- function(N,pi,MaleFraction,TreatedFraction,eta,gammaMean,gammaVar
   y <- rep(NA,N)
   for (j in 1:J){
     nj <- sum(siteID==j)
-    gamma[j,1]<- rnorm(1,gammaMean[1],gammaVar[1])
-    gamma[j,2]<- rnorm(1,gammaMean[2],gammaVar[2])
+    gamma[j,2] <- rnorm(1,gamma2[1],gamma2[2])
+    gamma[j,1] <- log(prevalence/followup)-eta[1]*TreatedFraction*(1-MaleFraction)-eta[2]*TreatedFraction-gamma[j,2]*MaleFraction
     theta[j,] <- c(eta,gamma[j,])
     mu_j <- exp(X[siteID==j,]%*%theta[j,])
     period_j <- period[siteID==j]
     yj <- rpois(nj, lambda=mu_j*period_j)
     y[siteID==j]=yj
   }
-  ppdata <- data.frame(y,X,period,siteID)
-  return(ppdata)
+  ppdata <- data.frame(y,X,period,siteID,stratumID, Treatment, Male)
+  return(list(ppdata=ppdata, theta = theta))
 }
 
 # Pooled analysis
 nlogLp_pool <- function(eta,ppdata){
   Lp<-rep(0)
-  J<- max(ppdata$siteID)
+  nStrata <- max(ppdata$stratumID)
+  SitestratumID <- (ppdata$siteID-1)*nStrata+ppdata$stratumID
+  J<- max(SitestratumID)
   for (j in 1:J){
-    ipdata <- ppdata[ppdata$siteID==j,]
+    ipdata <- ppdata[SitestratumID==j,]
     nlogLp <- function(eta){
       eta0<-eta
       X <- as.matrix(ipdata[,2:5])
@@ -45,7 +56,7 @@ nlogLp_pool <- function(eta,ppdata){
       return(nlogLp)
     }
     Lp <- nlogLp(eta)+Lp
-    #print(nlogLp(eta))
+    # print(nlogLp(eta))
   }
   return(Lp)
 }
@@ -54,8 +65,9 @@ estimatePool<- function(ppdata){
   return(list(est = c(eta.pool)))
 }
 
+
 # Meta analysis
-fit.bar <- function(ppdata,siteID){  ## use glm
+fit.bar <- function(ppdata){  ## use glm
   J<- max(ppdata$siteID)
   ehat <- matrix(NA,nrow = J,ncol=2)
   Vhat <-array(NA,c(J,2,2))
@@ -64,7 +76,10 @@ fit.bar <- function(ppdata,siteID){  ## use glm
     X <- as.matrix(ipdata[,2:5])
     y <- c(ipdata[,1])
     period <- ipdata$period
-    fit_j<-glm(y ~ -1+X[,1]+X[,2]+X[,3]+X[,4], offset = log(period), family = poisson(link = log))
+    stratumID <- ipdata$stratumID
+    new.stratumID <- sapply(1:max(stratumID),function(i) ifelse(stratumID==i,1,0))
+    Xnew.strata <- cbind(X[,1:2],X[,3]*new.stratumID,X[,4]*new.stratumID)
+    fit_j<-glm(y ~ -1+Xnew.strata, offset = log(period), family = poisson(link = log))
     ehat[j,] = fit_j$coefficients[1:2]
     Vhat[j,,] = vcov(fit_j)[1:2,1:2]
   }
@@ -73,7 +88,7 @@ fit.bar <- function(ppdata,siteID){  ## use glm
 
 
 estimateMeta <- function(ppdata){
-  fit.local<-fit.bar(ppdata,siteID)
+  fit.local<-fit.bar(ppdata)
   # remove studies with null
   ValidSite<-which(rowSums(is.na(fit.local$ehat))==0)
   eta.local<- fit.local$ehat[ValidSite,]
@@ -151,11 +166,24 @@ logLp_deriv <- function(ipdata,theta){
 }
 
 GetLocalDeriv <- function(ebar,ipdata){
-  fit_j<-glm(ipdata[,1] ~ -1+ipdata[,4]+ipdata[,5], offset = ipdata[,2:3]%*%ebar+log(ipdata[,6]),  family = poisson(link = log))
-  gfit_ebar<-fit_j$coefficients
-  thetaj <- c(ebar,gfit_ebar)
-  logLp_deriv_j<-logLp_deriv(ipdata,thetaj)
-  return(logLp_deriv_j)
+  
+  J<- max(ipdata$stratumID)
+  logLp <- 0
+  logLp_D1 <- rep(0,2)
+  logLp_D2 <- matrix(0,2,2)
+  logLp_D3 <- rep(0,4)
+  for (j in 1:J){
+    ipdata.strata <- as.matrix(ipdata[ipdata$stratumID==j,])
+    fit_j<-glm(ipdata.strata[,1] ~ -1+ipdata.strata[,4]+ipdata.strata[,5], offset = ipdata.strata[,2:3]%*%ebar+log(ipdata.strata[,6]),  family = poisson(link = log))
+    gfit_ebar<-fit_j$coefficients
+    thetaj <- c(ebar,gfit_ebar)
+    logLp_deriv_j<-logLp_deriv(ipdata.strata,thetaj)
+    logLp <- logLp_deriv_j$logLp+logLp
+    logLp_D1 <- logLp_deriv_j$logLp_D1+logLp_D1
+    logLp_D2 <- logLp_deriv_j$logLp_D2+logLp_D2
+    logLp_D3 <- logLp_deriv_j$logLp_D3+logLp_D3
+  }
+  return(list(logLp=logLp,logLp_D1=logLp_D1,logLp_D2=logLp_D2,logLp_D3=logLp_D3))
 }
 
 GetGlobalDeriv <- function(ebar,ppdata){
@@ -165,7 +193,7 @@ GetGlobalDeriv <- function(ebar,ppdata){
   logLp_D2 <- matrix(0,2,2)
   logLp_D3 <- rep(0,4)
   for (j in 1:J){
-    ipdata <- as.matrix(ppdata[ppdata$siteID==j,])
+    ipdata <- ppdata[ppdata$siteID==j,]
     logLp_deriv_j<-GetLocalDeriv(ebar,ipdata)
     logLp <- logLp_deriv_j$logLp+logLp
     logLp_D1 <- logLp_deriv_j$logLp_D1+logLp_D1
@@ -260,7 +288,10 @@ ellipse.plot.meta <- function(mua, mub, sa, sb, rho, n = NULL, alpha=0.05){
   ub <<- mub + sb*CC*cos(tt+acos(rho))
   return(data.frame(x = ua,y = ub))
 }
-ellipse.plot.pade <- function(coef, ebar){
+
+# ellipse.plot.pade0: old code to draw ellipse
+# source: https://stackoverflow.com/questions/41820683/how-to-plot-ellipse-given-a-general-equation-in-r
+ellipse.plot.pade0 <- function(coef, ebar){
   
   A = coef[5]
   C = coef[6]
@@ -275,13 +306,11 @@ ellipse.plot.pade <- function(coef, ebar){
   lambda <- eigen(M, symmetric = TRUE)$values
   detM0 <- det(M0)
   detM <- det(M)
-  if(abs(lambda[1] - A) < abs(lambda[1] - C)){
-    a <- sqrt(-det(M0)/(det(M)*lambda[1]))
-    b <- sqrt(-det(M0)/(det(M)*lambda[2]))
-  }else{
-    a <- sqrt(-det(M0)/(det(M)*lambda[2]))
-    b <- sqrt(-det(M0)/(det(M)*lambda[1]))
-  }
+  
+  a <- sqrt(-det(M0)/(det(M)*lambda[1]))
+  b <- sqrt(-det(M0)/(det(M)*lambda[2]))
+  
+  
   x <- B * E - 2 * C * D
   y <- B * D - 2 * A * E
   
@@ -299,5 +328,27 @@ ellipse.plot.pade <- function(coef, ebar){
   t <- seq(0, 2*pi, length = 1000)
   x <- xc + a*cos(t)*cos(phi) - b*sin(t)*sin(phi)
   y <- yc + a*cos(t)*sin(phi) + b*sin(t)*cos(phi)
+  return(data.frame(x = x+ebar[1],y = y+ebar[2]))
+}
+
+
+ellipse.plot.pade <- function(coef, ebar){
+  
+  a = coef[5]
+  b = coef[4]
+  c = coef[6]
+  d = coef[2]
+  e = coef[3]
+  f = coef[1]
+  
+  pi <- 3.14159265359
+  t <- seq(0, 2*pi, length = 1000)
+  
+  y.dis <- c-b^2/4/a
+  yc <- (e-d*b/2/a)/2/y.dis
+  yc2 <- yc^2*y.dis-f+d^2/4/a
+  
+  y <- sqrt(yc2/y.dis)*sin(t)-yc
+  x <- sqrt(yc2/a)*cos(t)-d/2/a-b/2/a*y
   return(data.frame(x = x+ebar[1],y = y+ebar[2]))
 }
