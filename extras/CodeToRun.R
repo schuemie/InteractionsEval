@@ -31,3 +31,6 @@ for (i in 2:length(databases)) {
 dataFolders <- sapply(databases, function(x) x$outputFolder)
 dataSet <- createAnalysisDataSet(dataFolders)
 saveRDS(dataSet, file.path(rootFolder, "DataSet.rds"))
+dataSet <- readRDS(file.path(rootFolder, "DataSet.rds"))
+
+evaluate2dPade(dataSet = dataSet, folder = rootFolder)

@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# library(dplyr)
 
 evaluate2dPade <- function(dataSet, folder) {
   alpha <- 0.05
@@ -48,7 +49,7 @@ evaluate2dPade <- function(dataSet, folder) {
     ebar <- ResMeta[[1]]
     
     message("- Computing local derivatives, and combining to global derivative")
-    deriv<-GetGlobalDeriv(ebar,ppdata)
+    deriv<-GetGlobalDeriv(ebar, ppdata)
     
     message("- Computing local derivatives")
     J<- max(ppdata$siteID)

@@ -47,8 +47,8 @@ nlogLp_pool <- function(eta,ppdata){
     ipdata <- ppdata[SitestratumID==j,]
     nlogLp <- function(eta){
       eta0<-eta
-      X <- as.matrix(ipdata[,2:5])
-      y <- c(ipdata[,1])
+      X <- as.matrix(ipdata%>%select("x1","x2","z1","z2"))
+      y <- ipdata$y
       period <- ipdata$period
       fit_j<-glm(y ~ -1+X[,3]+X[,4], offset = X[,1:2]%*%eta0+log(period),  family = poisson(link = log))
       gamma_fit<-fit_j$coefficients
@@ -56,7 +56,7 @@ nlogLp_pool <- function(eta,ppdata){
       return(nlogLp)
     }
     Lp <- nlogLp(eta)+Lp
-    # print(nlogLp(eta))
+    #print(nlogLp(eta))
   }
   return(Lp)
 }
@@ -73,8 +73,8 @@ fit.bar <- function(ppdata){  ## use glm
   Vhat <-array(NA,c(J,2,2))
   for (j in 1:J){
     ipdata <- ppdata[ppdata$siteID==j,]
-    X <- as.matrix(ipdata[,2:5])
-    y <- c(ipdata[,1])
+    X <- as.matrix(ipdata%>%select("x1","x2","z1","z2"))
+    y <- ipdata$y
     period <- ipdata$period
     stratumID <- ipdata$stratumID
     new.stratumID <- sapply(1:max(stratumID),function(i) ifelse(stratumID==i,1,0))
@@ -108,9 +108,9 @@ estimateMeta <- function(ppdata){
 ## Pade
 
 logLp_deriv <- function(ipdata,theta){
-  y <- ipdata[,1]
-  x1 <-ipdata[,2]; x2<-ipdata[,3];x3<-ipdata[,4]; x4<-ipdata[,5]
-  period <- ipdata[,6]
+  y <- ipdata$y
+  x1 <-ipdata$x1; x2<-ipdata$x2;x3<-ipdata$z1; x4<-ipdata$z2
+  period <- ipdata$period
   X <- cbind(x1,x2,x3,x4)
   eXt <- c(exp(X%*%theta))*period
   L01 <- colSums((y-eXt)*cbind(x3,x4))
@@ -173,8 +173,12 @@ GetLocalDeriv <- function(ebar,ipdata){
   logLp_D2 <- matrix(0,2,2)
   logLp_D3 <- rep(0,4)
   for (j in 1:J){
-    ipdata.strata <- as.matrix(ipdata[ipdata$stratumID==j,])
-    fit_j<-glm(ipdata.strata[,1] ~ -1+ipdata.strata[,4]+ipdata.strata[,5], offset = ipdata.strata[,2:3]%*%ebar+log(ipdata.strata[,6]),  family = poisson(link = log))
+    ipdata.strata <- ipdata[ipdata$stratumID==j,]
+    X <- as.matrix(ipdata.strata%>%select("x1","x2","z1","z2"))
+    y <- ipdata.strata$y
+    period <- ipdata.strata$period
+    
+    fit_j<-glm(y ~ -1+X[,3]+X[,4], offset = X[,1:2]%*%ebar+log(period),  family = poisson(link = log))
     gfit_ebar<-fit_j$coefficients
     thetaj <- c(ebar,gfit_ebar)
     logLp_deriv_j<-logLp_deriv(ipdata.strata,thetaj)
