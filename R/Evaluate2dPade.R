@@ -92,8 +92,8 @@ computeRrsFrom2dPade <- function(dataSet, folder) {
   results$negative <- results$outcomeId != 77
   breaks <- c(0.1, 0.25, 0.5, 1, 2, 4, 8)
   ggplot(results, aes(x = exp(pooled), y = exp(pade), group = var, color = negative)) +
-    geom_abline(slope = 0.5) + 
-    geom_point(alpha = 0.5) +
+    geom_abline(slope = 1) + 
+    geom_point(alpha = 1) +
     scale_x_log10(breaks = breaks, limits = c(0.1, 10)) +
     scale_y_log10(breaks = breaks, limits = c(0.1, 10)) +
     facet_grid(~var)
