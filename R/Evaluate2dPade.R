@@ -71,3 +71,31 @@ evaluate2dPade <- function(dataSet, folder) {
     # ls(envir = e)
   }
 }
+
+computeRrsFrom2dPade <- function(dataSet, folder) {
+  # alpha <- 0.05
+  results <- tibble()
+  padeFiles <- list.files(folder, "PadeArtifacts_o")
+  for (padeFile in padeFiles) {
+    load(file.path(folder, padeFile))
+    
+    outcomeId <- as.numeric(gsub("^PadeArtifacts_o", "", gsub(".rdata$", "", padeFile)))
+    result <- tibble(
+      outcomeId = outcomeId,
+      var = paste0("x", c(1, 2)),
+      pooled = ResPool$est,
+      pade = PECR$Est
+    )
+    results <- bind_rows(results, result)
+  }
+  library(ggplot2)
+  results$negative <- results$outcomeId != 77
+  breaks <- c(0.1, 0.25, 0.5, 1, 2, 4, 8)
+  ggplot(results, aes(x = exp(pooled), y = exp(pade), group = var, color = negative)) +
+    geom_abline(slope = 0.5) + 
+    geom_point(alpha = 0.5) +
+    scale_x_log10(breaks = breaks, limits = c(0.1, 10)) +
+    scale_y_log10(breaks = breaks, limits = c(0.1, 10)) +
+    facet_grid(~var)
+  ggsave(file.path(folder, "PadeVsPooled.png"))
+}
