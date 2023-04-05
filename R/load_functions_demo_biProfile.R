@@ -47,8 +47,8 @@ nlogLp_pool <- function(eta,ppdata){
     ipdata <- ppdata[SitestratumID==j,]
     nlogLp <- function(eta){
       eta0<-eta
-      X <- as.matrix(ipdata%>%select("x1","x2","z1","z2"))
-      y <- ipdata$y
+      X <- as.matrix(ipdata[,2:5])
+      y <- c(ipdata[,1])
       period <- ipdata$period
       fit_j<-glm(y ~ -1+X[,3]+X[,4], offset = X[,1:2]%*%eta0+log(period),  family = poisson(link = log))
       gamma_fit<-fit_j$coefficients
@@ -73,8 +73,8 @@ fit.bar <- function(ppdata){  ## use glm
   Vhat <-array(NA,c(J,2,2))
   for (j in 1:J){
     ipdata <- ppdata[ppdata$siteID==j,]
-    X <- as.matrix(ipdata%>%select("x1","x2","z1","z2"))
-    y <- ipdata$y
+    X <- as.matrix(ipdata[,2:5])
+    y <- c(ipdata[,1])
     period <- ipdata$period
     stratumID <- ipdata$stratumID
     new.stratumID <- sapply(1:max(stratumID),function(i) ifelse(stratumID==i,1,0))
@@ -108,9 +108,9 @@ estimateMeta <- function(ppdata){
 ## Pade
 
 logLp_deriv <- function(ipdata,theta){
-  y <- ipdata$y
-  x1 <-ipdata$x1; x2<-ipdata$x2;x3<-ipdata$z1; x4<-ipdata$z2
-  period <- ipdata$period
+  y <- ipdata[,1]
+  x1 <-ipdata[,2]; x2<-ipdata[,3];x3<-ipdata[,4]; x4<-ipdata[,5]
+  period <- ipdata[,6]
   X <- cbind(x1,x2,x3,x4)
   eXt <- c(exp(X%*%theta))*period
   L01 <- colSums((y-eXt)*cbind(x3,x4))
@@ -173,12 +173,8 @@ GetLocalDeriv <- function(ebar,ipdata){
   logLp_D2 <- matrix(0,2,2)
   logLp_D3 <- rep(0,4)
   for (j in 1:J){
-    ipdata.strata <- ipdata[ipdata$stratumID==j,]
-    X <- as.matrix(ipdata.strata%>%select("x1","x2","z1","z2"))
-    y <- ipdata.strata$y
-    period <- ipdata.strata$period
-    
-    fit_j<-glm(y ~ -1+X[,3]+X[,4], offset = X[,1:2]%*%ebar+log(period),  family = poisson(link = log))
+    ipdata.strata <- as.matrix(ipdata[ipdata$stratumID==j,])
+    fit_j<-glm(ipdata.strata[,1] ~ -1+ipdata.strata[,4]+ipdata.strata[,5], offset = ipdata.strata[,2:3]%*%ebar+log(ipdata.strata[,6]),  family = poisson(link = log))
     gfit_ebar<-fit_j$coefficients
     thetaj <- c(ebar,gfit_ebar)
     logLp_deriv_j<-logLp_deriv(ipdata.strata,thetaj)
@@ -276,7 +272,10 @@ PadeEstCR<- function(ebar,PadeCoef,alpha=0.05){
   # CR
   coef.CR<-num_vec-denom_vec*c(-eta.pade$value-qchisq(1-alpha,2)/2)
   
-  return(list(Est=PadeEst,CR=coef.CR))
+  # CI
+  coef.CI<-num_vec-denom_vec*c(-eta.pade$value-qchisq(1-alpha,1)/2)
+  
+  return(list(Est=PadeEst,CR=coef.CR, CI=coef.CI))
 }
 
 
@@ -356,3 +355,47 @@ ellipse.plot.pade <- function(coef, ebar){
   x <- sqrt(yc2/a)*cos(t)-d/2/a-b/2/a*y
   return(data.frame(x = x+ebar[1],y = y+ebar[2]))
 }
+
+
+ci.plot.pade <- function(coef, ebar){
+  
+  # caculate the CI of the first parameter
+  
+  c = coef[5]
+  b = coef[4]
+  a = coef[6]
+  e = coef[2]
+  d = coef[3]
+  f = coef[1]
+  
+  b_tilde <- c-b^2/4/a
+  e_tilde <- e-d*b/2/a
+  x_tilde <- (d^2/4/a+e_tilde^2/4/b_tilde-f)/b_tilde
+  xmin <- -sqrt(x_tilde)-e_tilde/2/b_tilde
+  xmax <- sqrt(x_tilde)-e_tilde/2/b_tilde
+  lower1 <- min(xmin,xmax)+ebar[1]
+  upper1 <- max(xmin,xmax)+ebar[1]
+  
+  
+  
+  # caculate the CI of the second parameter
+  a = coef[5]
+  b = coef[4]
+  c = coef[6]
+  d = coef[2]
+  e = coef[3]
+  f = coef[1]
+  
+  b_tilde <- c-b^2/4/a
+  e_tilde <- e-d*b/2/a
+  y_tilde <- (d^2/4/a+e_tilde^2/4/b_tilde-f)/b_tilde
+  ymin <- -sqrt(y_tilde)-e_tilde/2/b_tilde
+  ymax <- sqrt(y_tilde)-e_tilde/2/b_tilde
+  lower2 <- min(ymin,ymax)+ebar[2]
+  upper2 <- max(ymin,ymax)+ebar[2]
+  
+  
+  return(list(CI1 = c(lower1,upper1), CI2= c(lower2,upper2)))
+}
+
+

@@ -72,19 +72,30 @@ evaluate2dPade <- function(dataSet, folder) {
   }
 }
 
-computeRrsFrom2dPade <- function(dataSet, folder) {
+computeRrsFrom2dPade <- function(folder) {
   # alpha <- 0.05
   results <- tibble()
   padeFiles <- list.files(folder, "PadeArtifacts_o")
   for (padeFile in padeFiles) {
     load(file.path(folder, padeFile))
-    
+    # Recompute Pade estimate to get CIs:
+    ebar <- ResMeta[[1]]
+    ResPade <- PadeEstCR(ebar = ebar, PadeCoef = PadeCoef)
+    coef <- ResPade$CR
+    coef.CI <- ResPade$CI
+    plotCI.pade.ellipse <- ellipse.plot.pade(coef.CI, ebar)
+    plotCI.pade <- ci.plot.pade(coef.CI, ebar)
+    ci <- plotCI.pade
     outcomeId <- as.numeric(gsub("^PadeArtifacts_o", "", gsub(".rdata$", "", padeFile)))
     result <- tibble(
       outcomeId = outcomeId,
       var = paste0("x", c(1, 2)),
       pooled = ResPool$est,
-      pade = PECR$Est
+      pade = PECR$Est,
+      logRr = PECR$Est,
+      logCi95Lb = c(ci$CI1[1], ci$CI2[1]),
+      logCi95Ub = c(ci$CI1[2], ci$CI2[2]),
+      seLogRr = c(ci$CI1[2] - ci$CI1[1], ci$CI2[2] - ci$CI2[1]) / (2*qnorm(0.975))
     )
     results <- bind_rows(results, result)
   }
@@ -97,5 +108,34 @@ computeRrsFrom2dPade <- function(dataSet, folder) {
     scale_x_log10(breaks = breaks, limits = c(0.1, 10)) +
     scale_y_log10(breaks = breaks, limits = c(0.1, 10)) +
     facet_grid(~var)
-  ggsave(file.path(folder, "PadeVsPooled.png"))
+  ggsave(file.path(folder, "PadeVsPooledPoisson.png"))
+  ncs1 <- results %>%
+    filter(var == "x1" & negative) 
+  ncs2 <- results %>%
+    filter(var == "x2" & negative) 
+  hoi1 <- results %>%
+    filter(var == "x1" & !negative) 
+  hoi2 <- results %>%
+    filter(var == "x2" & !negative)
+  EmpiricalCalibration::plotCalibrationEffect(
+    logRrNegatives = ncs1$logRr,
+    seLogRrNegatives = ncs1$seLogRr,
+    logRrPositives = hoi1$logRr,
+    seLogRrPositives = hoi1$seLogRr,
+    xLabel = "Incidence Rate Ratio",
+    title = "Variable x1",
+    showCis = TRUE,
+    showExpectedAbsoluteSystematicError = TRUE,
+    fileName = file.path(folder, "PadePoissonX1.png")
+  )
+  EmpiricalCalibration::plotCalibrationEffect(
+    logRrNegatives = ncs2$logRr,
+    seLogRrNegatives = ncs2$seLogRr,
+    logRrPositives = hoi2$logRr,
+    seLogRrPositives = hoi2$seLogRr,
+    xLabel = "Incidence Rate Ratio",
+    title = "Variable x2",
+    showCis = TRUE,
+    showExpectedAbsoluteSystematicError = TRUE
+  )
 }
