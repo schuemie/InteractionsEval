@@ -21,7 +21,7 @@ computeDiagnostics <- function(outputFolder) {
   # Negative controls ----------------------------------------------------------
   resultsSummary <- CohortMethod::getResultsSummary(outputFolder)
   interactionResultsSummary <- CohortMethod::getInteractionResultsSummary(outputFolder)
-  # subset = subsets[[1]]
+  # subset = subsets[[6]]
   plotNegativeControls <- function(subset, interactions = FALSE) {
     fileName <- file.path(outputFolder, sprintf("ncs%s_a%d.png", if(interactions) "_interactions" else "", subset$analysisId[1]))
     ncs <- subset %>%
@@ -33,7 +33,9 @@ computeDiagnostics <- function(outputFolder) {
       seLogRrNegatives = ncs$seLogRr,
       logRrPositives = hois$logRr,
       seLogRrPositives = hois$seLogRr,
-      fileName = fileName
+      fileName = fileName,
+      showCis = TRUE,
+      showExpectedAbsoluteSystematicError = TRUE
     )
     invisible(NULL)
   }
@@ -53,6 +55,19 @@ computeDiagnostics <- function(outputFolder) {
     showEquiposeLabel = TRUE,
     fileName = fileName
   )
+  
+  # Covariate balance ----------------------------------------------------------
+  balanceFiles <- unique(fileReference$sharedBalanceFile)
+  for (balanceFile in balanceFiles) {
+    fileName <- file.path(outputFolder, gsub(".rds", ".png", balanceFile))
+    balance <- readRDS(file.path(outputFolder, balanceFile))
+    CohortMethod::plotCovariateBalanceScatterPlot(balance, fileName = fileName)
+  }
+  for (balanceFile in balanceFiles) {
+    fileName <- file.path(outputFolder, gsub("Balance", "BalTop", gsub(".rds", ".png", balanceFile)))
+    balance <- readRDS(file.path(outputFolder, balanceFile))
+    CohortMethod::plotCovariateBalanceOfTopVariables(balance, fileName = fileName)
+  }
   
   # Concurrent medication ------------------------------------------------------
   # cmData <- CohortMethod::loadCohortMethodData(file.path(outputFolder, fileReference$cohortMethodDataFile[1]))

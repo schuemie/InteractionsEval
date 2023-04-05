@@ -159,7 +159,37 @@ runCohortMethod <- function(connectionDetails,
     computeSharedCovariateBalanceArgs = computeSharedCovBalArgs,
     fitOutcomeModelArgs = fitOutcomeModelArgsCoxInteraction
   )
-  cmAnalysisList <- list(cmAnalysis1, cmAnalysis2, cmAnalysis3, cmAnalysis4)
+  
+  matchOnPsArgs <- CohortMethod::createMatchOnPsArgs(maxRatio = 1)
+  fitOutcomeModelArgsPoissonNonStratified <- CohortMethod::createFitOutcomeModelArgs(
+    modelType = "poisson",
+    stratified = FALSE
+  )
+  cmAnalysis5 <- CohortMethod::createCmAnalysis(
+    analysisId = 5,
+    description = "Poisson regression, matching",
+    getDbCohortMethodDataArgs = getDbCmDataArgs,
+    createStudyPopArgs = createStudyPopArgsOnTreatment,
+    createPsArgs = createPsArgs,
+    matchOnPsArgs = matchOnPsArgs,
+    computeSharedCovariateBalanceArgs = computeSharedCovBalArgs,
+    fitOutcomeModelArgs = fitOutcomeModelArgsPoissonNonStratified
+  )
+  fitOutcomeModelArgsCoxNonStratified <- CohortMethod::createFitOutcomeModelArgs(
+    modelType = "cox",
+    stratified = FALSE
+  )
+  cmAnalysis6 <- CohortMethod::createCmAnalysis(
+    analysisId = 6,
+    description = "Cox regression, matching",
+    getDbCohortMethodDataArgs = getDbCmDataArgs,
+    createStudyPopArgs = createStudyPopArgsOnTreatment,
+    createPsArgs = createPsArgs,
+    matchOnPsArgs = matchOnPsArgs,
+    computeSharedCovariateBalanceArgs = computeSharedCovBalArgs,
+    fitOutcomeModelArgs = fitOutcomeModelArgsCoxNonStratified
+  )
+  cmAnalysisList <- list(cmAnalysis1, cmAnalysis2, cmAnalysis3, cmAnalysis4, cmAnalysis5, cmAnalysis6)
   # cmAnalysisList <- list(cmAnalysis2, cmAnalysis4)
 
   CohortMethod::saveCmAnalysisList(cmAnalysisList, file.path(outputFolder, "cmAnalysisList.json"))
