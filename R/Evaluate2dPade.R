@@ -16,7 +16,7 @@
 # library(dplyr)
 # source("R/load_functions_demo_biProfile.R")
 
-evaluate2dPade <- function(dataSet, folder) {
+evaluate2dPadePoisson <- function(dataSet, folder) {
   alpha <- 0.05
   analysisId <- 3 # Poisson
   outcomeIds <- unique(dataSet$outcomeId)
@@ -136,6 +136,63 @@ computeRrsFrom2dPade <- function(folder) {
     xLabel = "Incidence Rate Ratio",
     title = "Variable x2",
     showCis = TRUE,
-    showExpectedAbsoluteSystematicError = TRUE
+    showExpectedAbsoluteSystematicError = TRUE,
+    fileName = file.path(folder, "PadePoissonX2.png")
   )
+}
+
+evaluate2dPadeCox <- function(dataSet, folder) {
+  alpha <- 0.05
+  analysisId <- 4 # Cox
+  outcomeIds <- unique(dataSet$outcomeId)
+  # i = 1
+  for (i in seq_along(outcomeIds)) {
+    fileName <- file.path(folder, sprintf("PadeArtifactsCox_o%d.rdata", outcomeIds[i]))
+    if (!file.exists(fileName)) {
+      message(sprintf("Processing outcome %d of %d", i, length(outcomeIds)))
+      ppdata <- dataSet %>%
+        filter(.data$outcomeId == outcomeIds[i],
+               .data$analysisId == !!analysisId) %>%
+        mutate(x1 = treatment * (1 - subgroup),
+               x2 = treatment * subgroup,
+               z1 = subgroup,
+               status = as.numeric(y > 0)) %>%
+        select("time",
+               "status",
+               "x1", 
+               "x2",
+               "z1",
+               siteID = "siteId",
+               stratumID = "stratumId",
+               male = "subgroup"
+              ) %>%
+        as.data.frame()
+      message("- Computing pooled estimate")
+      start <- Sys.time()
+      ResPool <- estimatePoolCox(ppdata)
+      delta <- Sys.time() - start
+      message("  computing pooled estimate took ", signif(delta, 3), " ", attr(delta, "units"))
+      
+      message("- Computing meta-analytic estimate")
+      ResMeta <- estimateMetaCox(ppdata)
+      ebar <- ResMeta[[1]]
+      
+      message("- Computing local derivatives, and combining to global derivative")
+      deriv<-GetGlobalDerivCox(ebar, ppdata)
+      
+      message("- Computing local derivatives")
+      J<- max(ppdata$siteID)
+      LocalDeriv <- lapply(1:J, function(j){
+        ipdata <- ppdata[ppdata$siteID==j,]
+        return(GetLocalDerivCox(ebar,ipdata))
+      })
+      
+      PadeCoef <- EstPadeCoefCox(deriv)
+      PECR <- PadeEstCRCox(ebar,PadeCoef)
+      save(ResPool, ResMeta, deriv, LocalDeriv, PadeCoef, PECR, file = fileName)
+    } 
+    # e <- new.env()
+    # load(file = file.path(folder, sprintf("PadeArtifacts_o%d.rdata", outcomeIds[i])), env = e)
+    # ls(envir = e)
+  }
 }

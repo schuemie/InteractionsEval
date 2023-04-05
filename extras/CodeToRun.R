@@ -33,4 +33,5 @@ dataSet <- createAnalysisDataSet(dataFolders)
 saveRDS(dataSet, file.path(rootFolder, "DataSet.rds"))
 dataSet <- readRDS(file.path(rootFolder, "DataSet.rds"))
 
-evaluate2dPade(dataSet = dataSet, folder = rootFolder)
+evaluate2dPadeevaluate2dPadePoisson(dataSet = dataSet, folder = rootFolder)
+evaluate2dPadeevaluate2dPadeCox(dataSet = dataSet, folder = rootFolder)
