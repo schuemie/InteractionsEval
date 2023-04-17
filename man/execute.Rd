@@ -14,8 +14,7 @@ execute(
   databaseId = "Unknown",
   createCohorts = TRUE,
   runCohortMethod = TRUE,
-  maxCores = 4,
-  minCellCount = 5
+  maxCores = 4
 )
 }
 \arguments{

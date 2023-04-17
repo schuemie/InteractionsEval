@@ -3,9 +3,9 @@ library(survival)
 
 ##simulate data###
 createSetting2DCox <- function (nSites = 5, n = 10000, treatedFraction = 0.2, maleFraction = 0.2, CensorHazard=0.001,
-                             minBackgroundHazard = 2e-07, maxBackgroundHazard = 2e-05, 
-                             trtFBeta = log(2), trtMBeta = log(2), MBeta = log(2),
-                             randomEffectSd = 0, nStrata = 1) {
+                                minBackgroundHazard = 2e-07, maxBackgroundHazard = 2e-05, 
+                                trtFBeta = log(2), trtMBeta = log(2), MBeta = log(2),
+                                randomEffectSd = 0, nStrata = 1) {
   expand <- function(x) {
     if (length(x) == 1) {
       return(rep(x, nSites))
@@ -133,25 +133,42 @@ estimatePoolCox<- function(ppdata){
 
 
 ####meta###
-fit.barCox <- function(ppdata){  ## use glm
-  J<- max(ppdata$siteID)
-  ehat <- matrix(NA,nrow = J,ncol=2)
-  Vhat <-array(NA,c(J,2,2))
-  for (j in 1:J){
-    ipdata <- ppdata[ppdata$siteID==j,]
+fit.barCox <- function(ppdata){  
+  SiteID<-ppdata$siteID
+  J<- unique(SiteID)
+  ehat <- matrix(NA,nrow = length(J),ncol=2)
+  Vhat <-array(NA,c(length(J),2,2))
+  i<-1
+  for (j in J){
+    spdata <- ppdata[SiteID==j,]
+    StratumId<-spdata$stratumID
+    K<-unique(StratumId)
+    ipdata<-NULL
+    for(k in K){ #remove stratum with 0 events
+      if(sum(spdata[StratumId==k,]$status)>0){
+        ipdata<-rbind(ipdata,spdata[StratumId==k,])
+      }
+    }
+    if(is.null(ipdata)){
+      i<-i+1
+      next
+    }
     x1<-ipdata$x1
     x2<-ipdata$x2
     x3<-ipdata$z1
     StratumId <- ipdata$stratumID
-    new.stratumID <- sapply(1:max(StratumId),function(i) ifelse(StratumId==i,1,0))
+    K<-unique(StratumId)
+    new.stratumID <- sapply(K,function(i) ifelse(StratumId==i,1,0))
     X <- cbind(x1,x2,x3*new.stratumID)
     #X <- cbind(x1,x2,x3)
     y_time<-ipdata$time
     y_status<-ipdata$status
-    fit_j<-coxph.fit(x=X, y=Surv(y_time, y_status),strata = NULL,
+    # fit cox with statum-specific nuisance parameter
+    fit_j<-coxph.fit(x=X, y=Surv(y_time, y_status),strata = NULL, 
                      control =coxph.control(),rownames = NULL, method="breslow")
-    ehat[j,] = fit_j$coefficients[1:2]
-    Vhat[j,,] = fit_j$var[1:2,1:2]
+    ehat[i,] = fit_j$coefficients[1:2]
+    Vhat[i,,] = fit_j$var[1:2,1:2]
+    i<-i+1
   }
   return(list(ehat=ehat,Vhat=Vhat))
 }
@@ -159,8 +176,8 @@ fit.barCox <- function(ppdata){  ## use glm
 estimateMetaCox <- function(ppdata){
   fit.local<-fit.barCox(ppdata)
   # remove studies with null
-  #ValidSite<-which(rowSums(is.na(fit.local$ehat))==0)
-  ValidSite<-which(fit.local$Vhat[,1,1]>0  & fit.local$Vhat[,2,2]>0 )
+  ValidSite<-which(rowSums(is.na(fit.local$ehat))==0)
+  #ValidSite<-which(fit.local$Vhat[,1,1]>0  & fit.local$Vhat[,2,2]>0 )
   eta.local<- fit.local$ehat[ValidSite,]
   vcov.local <- fit.local$Vhat[ValidSite,,]
   eMeta <- rep(0)
@@ -176,6 +193,7 @@ estimateMetaCox <- function(ppdata){
 
 
 
+
 ###pade###
 
 logLp_derivCox <- function(ipdata,eta){
@@ -188,11 +206,11 @@ logLp_derivCox <- function(ipdata,eta){
   x3<-ipdata$z1
   X <- cbind(x1,x2,x3)
   if(length(index_1)>0){
-  fit_j<-coxph.fit(x=cbind(X[,3]), y=Surv(y_time, y_status),strata = NULL,offset = X[,1:2]%*%eta,
-                   control =coxph.control(),rownames = NULL,method="breslow")
-  beta<-c(eta,fit_j$coefficients)
-  expy <- exp(X%*%beta)
-
+    fit_j<-coxph.fit(x=cbind(X[,3]), y=Surv(y_time, y_status),strata = NULL,offset = X[,1:2]%*%eta,
+                     control =coxph.control(),rownames = NULL,method="breslow")
+    beta<-c(eta,fit_j$coefficients)
+    expy <- exp(X%*%beta)
+    
     s_expy<-cumsum(expy)[index_1]
     expy_z<-cumsum(expy*x3)[index_1]
     expy_x1<-cumsum(expy*x1)[index_1]
@@ -357,8 +375,8 @@ GetGlobalDerivCox <- function(ebar, ppdata){
 }
 
 EstPadeCoefCox<- function(deriv,Midx = rbind(c(0,0),c(1,0),c(0,1),c(1,1),c(2,0),c(0,2)),
-                       Nidx = rbind(c(0,0),c(1,0),c(0,1),c(1,1),c(2,0),c(0,2)),
-                       Eidx = rbind(Midx,c(3,0),c(0,3))){
+                          Nidx = rbind(c(0,0),c(1,0),c(0,1),c(1,1),c(2,0),c(0,2)),
+                          Eidx = rbind(Midx,c(3,0),c(0,3))){
   c0 <- deriv$logLp
   c1 <- deriv$logLp_D1
   c2 <- deriv$logLp_D2/2

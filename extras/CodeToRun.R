@@ -15,23 +15,24 @@ for (i in 1:length(databases)) {
     verifyDependencies = TRUE,
     outputFolder = database$outputFolder,
     databaseId = database$databaseId,
-    createCohorts = F,
+    createCohorts = TRUE,
     runCohortMethod = TRUE,
     maxCores = maxCores
   )
 }
 
 
-for (i in 2:length(databases)) {
+for (i in 4:length(databases)) {
   database <- databases[[i]]
   message(sprintf("***** Computing diagnostics on %s *****", database$databaseId))
   computeDiagnostics(database$outputFolder)
 }
 
 dataFolders <- sapply(databases, function(x) x$outputFolder)
+dataFolders <- dataFolders[dataFolders != "d:/interactionEval/OptumEhr"]
 dataSet <- createAnalysisDataSet(dataFolders)
 saveRDS(dataSet, file.path(rootFolder, "DataSet.rds"))
 dataSet <- readRDS(file.path(rootFolder, "DataSet.rds"))
 
-evaluate2dPadeevaluate2dPadePoisson(dataSet = dataSet, folder = rootFolder)
+evaluate2dPadePoisson(dataSet = dataSet, folder = rootFolder)
 evaluate2dPadeevaluate2dPadeCox(dataSet = dataSet, folder = rootFolder)

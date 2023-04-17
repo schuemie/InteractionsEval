@@ -15,6 +15,7 @@
 # limitations under the License.
 
 # library(dplyr)
+#' @export
 computeDiagnostics <- function(outputFolder) {
   fileReference <- CohortMethod::getFileReference(outputFolder)
   
