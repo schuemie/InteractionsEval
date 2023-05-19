@@ -76,38 +76,54 @@ simulatePopulations2DCox <- function (settings = createSimulationSettings())
   return(simulation)
 }
 
+######derivative
 
-
+deriveCox<-function(beta,X,index_1){
+  y_mu<-X%*%beta
+  expy<-exp(y_mu)
+  
+  s_expy<-cumsum(expy)[index_1]
+  expy_z<-cumsum(expy*X[,3])[index_1]
+  
+  derive<-sum(X[index_1,3]-expy_z/s_expy)
+  derive
+}
 
 
 # Pooled analysis
 nlogLp_poolCox <- function(eta,ppdata){
   Lp<-rep(0)
   SiteID<-ppdata$siteID
-  J<- max(SiteID)
-  for (j in 1:J){
+  J<- unique(SiteID)
+  for (j in J){
     spdata<-ppdata[SiteID==j,]
     StratumId<-spdata$stratumID
-    K<-max(StratumId)
-    for(k in 1:K){
+    K<-unique(StratumId)
+    for(k in K){
       ipdata <- spdata[StratumId==k,]
       ipdata<-ipdata[order(-ipdata$time),]
-      y_time<-ipdata$time
-      y_status<-ipdata$status
-      index_1<-which(y_status==TRUE)
-      nlogLp <- function(eta, ipdata){
-        x1<-ipdata$x1
-        x2<-ipdata$x2
-        x3<-ipdata$z1
-        X <- cbind(x1,x2,x3)
-        fit_j<-coxph.fit(x=cbind(X[,3]), y=Surv(y_time, y_status),strata = NULL,offset = X[,1:2]%*%eta,
-                         control =coxph.control(),rownames = NULL,method="breslow")
-        gamma_fit<-fit_j$coefficients
-        beta<-c(eta,gamma_fit)
-        y_mu<-X%*%beta
-        expy<-exp(y_mu)
-        
+      nlogLp <- function(eta,ipdata){
+        y_time<-ipdata$time
+        y_status<-ipdata$status
+        index_1<-which(y_status==TRUE)
         if(length(index_1)>0){
+          x1<-ipdata$x1
+          x2<-ipdata$x2
+          x3<-ipdata$z1
+          X <- cbind(x1,x2,x3)
+          fit_j<-coxph.fit(x=cbind(X[,3]), y=Surv(y_time, y_status),strata = NULL,offset = X[,1:2]%*%eta,
+                           control =coxph.control(),rownames = NULL,method="breslow")
+          if(!is.na(fit_j$coefficients)){
+            gamma_fit<-fit_j$coefficients
+          }else{
+            gamma<-seq(-10,10,0.1)
+            beta<-cbind(eta[1],eta[2],gamma)
+            derive<-apply(beta, 1, function(x){deriveCox(x,X,index_1) })
+            gamma_fit<-gamma[which.min(abs(derive))]
+          }
+          beta<-c(eta,gamma_fit)
+          y_mu<-X%*%beta
+          expy<-exp(y_mu)
           s_expy<-cumsum(expy)[index_1]
           nlogLp <- -sum(y_mu[index_1])+sum(log(s_expy))
         }else{
@@ -122,14 +138,10 @@ nlogLp_poolCox <- function(eta,ppdata){
   return(Lp)
 }
 
-
 estimatePoolCox<- function(ppdata){
   eta.pool <- optim(c(1,1),nlogLp_poolCox,ppdata = ppdata)$par
   return(list(est = c(eta.pool)))
 }
-
-
-
 
 
 ####meta###
@@ -165,7 +177,12 @@ fit.barCox <- function(ppdata){
     y_status<-ipdata$status
     # fit cox with statum-specific nuisance parameter
     fit_j<-coxph.fit(x=X, y=Surv(y_time, y_status),strata = NULL, 
-                     control =coxph.control(),rownames = NULL, method="breslow")
+                     control =coxph.control(),rownames = NULL, method="efron")
+    # fit_j=ipcw(Hist(time=time,event=status)~x1+x2+z1,
+    #            data=ipdata,
+    #            method="cox",
+    #            times=sort(unique(ipdata$time)),
+    #            subject.times=ipdata$time,keep=c("fit"))
     ehat[i,] = fit_j$coefficients[1:2]
     Vhat[i,,] = fit_j$var[1:2,1:2]
     i<-i+1
@@ -207,7 +224,15 @@ logLp_derivCox <- function(ipdata,eta){
   X <- cbind(x1,x2,x3)
   if(length(index_1)>0){
     fit_j<-coxph.fit(x=cbind(X[,3]), y=Surv(y_time, y_status),strata = NULL,offset = X[,1:2]%*%eta,
-                     control =coxph.control(),rownames = NULL,method="breslow")
+                     control =coxph.control(),rownames = NULL,method="efron")
+    if(!is.na(fit_j$coefficients)){
+      gamma_fit<-fit_j$coefficients
+    }else{
+      gamma<-seq(-10,10,0.1)
+      beta<-cbind(eta[1],eta[2],gamma)
+      derive<-apply(beta, 1, function(x){deriveCox(x,X,index_1) })
+      gamma_fit<-gamma[which.min(abs(derive))]
+    }
     beta<-c(eta,fit_j$coefficients)
     expy <- exp(X%*%beta)
     
@@ -444,7 +469,10 @@ PadeEstCRCox<- function(ebar,PadeCoef,alpha=0.05){
   # CR
   coef.CR<-num_vec-denom_vec*c(-eta.pade$value-qchisq(1-alpha,2)/2)
   
-  return(list(Est=PadeEst,CR=coef.CR))
+  # CI
+  coef.CI<-num_vec-denom_vec*c(-eta.pade$value-qchisq(1-alpha,1)/2)
+  
+  return(list(Est=PadeEst,CR=coef.CR, CI=coef.CI))
 }
 
 
@@ -524,3 +552,46 @@ ellipse.plot.padeCox <- function(coef, ebar){
   x <- sqrt(yc2/a)*cos(t)-d/2/a-b/2/a*y
   return(data.frame(x = x+ebar[1],y = y+ebar[2]))
 }
+
+ci.plot.padeCox <- function(coef, ebar){
+  
+  # caculate the CI of the first parameter
+  
+  c = coef[5]
+  b = coef[4]
+  a = coef[6]
+  e = coef[2]
+  d = coef[3]
+  f = coef[1]
+  
+  b_tilde <- c-b^2/4/a
+  e_tilde <- e-d*b/2/a
+  x_tilde <- (d^2/4/a+e_tilde^2/4/b_tilde-f)/b_tilde
+  xmin <- -sqrt(x_tilde)-e_tilde/2/b_tilde
+  xmax <- sqrt(x_tilde)-e_tilde/2/b_tilde
+  lower1 <- min(xmin,xmax)+ebar[1]
+  upper1 <- max(xmin,xmax)+ebar[1]
+  
+  
+  
+  # caculate the CI of the second parameter
+  a = coef[5]
+  b = coef[4]
+  c = coef[6]
+  d = coef[2]
+  e = coef[3]
+  f = coef[1]
+  
+  b_tilde <- c-b^2/4/a
+  e_tilde <- e-d*b/2/a
+  y_tilde <- (d^2/4/a+e_tilde^2/4/b_tilde-f)/b_tilde
+  ymin <- -sqrt(y_tilde)-e_tilde/2/b_tilde
+  ymax <- sqrt(y_tilde)-e_tilde/2/b_tilde
+  lower2 <- min(ymin,ymax)+ebar[2]
+  upper2 <- max(ymin,ymax)+ebar[2]
+  
+  
+  return(list(CI1 = c(lower1,upper1), CI2= c(lower2,upper2)))
+}
+
+
