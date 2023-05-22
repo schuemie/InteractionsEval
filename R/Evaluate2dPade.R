@@ -15,6 +15,7 @@
 # limitations under the License.
 # library(dplyr)
 # source("R/load_functions_demo_biProfile.R")
+# source("R/load_functions_demo_coxProfile.R")
 
 evaluate2dPadePoisson <- function(dataSet, folder) {
   alpha <- 0.05

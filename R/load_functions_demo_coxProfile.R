@@ -233,7 +233,7 @@ logLp_derivCox <- function(ipdata,eta){
       derive<-apply(beta, 1, function(x){deriveCox(x,X,index_1) })
       gamma_fit<-gamma[which.min(abs(derive))]
     }
-    beta<-c(eta,fit_j$coefficients)
+    beta<-c(eta, gamma_fit)
     expy <- exp(X%*%beta)
     
     s_expy<-cumsum(expy)[index_1]
