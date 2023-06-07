@@ -76,7 +76,7 @@ simulatePopulations2DCox <- function (settings = createSimulationSettings())
   return(simulation)
 }
 
-######derivative
+######derive
 
 deriveCox<-function(beta,X,index_1){
   y_mu<-X%*%beta
@@ -142,6 +142,54 @@ estimatePoolCox<- function(ppdata){
   eta.pool <- optim(c(1,1),nlogLp_poolCox,ppdata = ppdata)$par
   return(list(est = c(eta.pool)))
 }
+
+#####ipcw pool#######
+nlogLp_poolCox_IPCW <- function(eta,ppdata){
+  Lp<-rep(0)
+  SiteID<-ppdata$siteID
+  J<- unique(SiteID)
+  for (j in J){
+    spdata<-ppdata[SiteID==j,]
+    StratumId<-spdata$stratumID
+    K<-unique(StratumId)
+    for(k in K){
+      ipdata <- spdata[StratumId==k,]
+      ipdata<-ipdata[order(-ipdata$time),]
+      nlogLp <- function(eta,ipdata){
+        y_time<-ipdata$time
+        y_status<-ipdata$status
+        index_1<-which(y_status==TRUE)
+        if(length(index_1)>0){
+          x1<-ipdata$x1
+          x2<-ipdata$x2
+          x3<-ipdata$z1
+          X <- cbind(x1,x2,x3)
+          fit_j<-coxph.fit(x=cbind(X[,3]), y=Surv(y_time, y_status),strata = NULL,offset = X[,1:2]%*%eta,
+                           control =coxph.control(),rownames = NULL,weights =ipdata$weight,method="breslow")
+          gamma_fit<-fit_j$coefficients
+          beta<-c(eta,gamma_fit)
+          y_mu<-X%*%beta
+          expy<-ipdata$weight*exp(y_mu)
+          s_expy<-cumsum(expy)[index_1]
+          nlogLp <- -sum(log(ipdata$weight[index_1])+ y_mu[index_1])+sum(log(s_expy))
+        }else{
+          nlogLp<-0
+        }
+        return(nlogLp)
+      }
+      Lp <- nlogLp(eta,ipdata)+Lp
+      #print(nlogLp(eta))
+    }
+  }
+  return(Lp)
+}
+
+estimatePoolCox_IPCW<- function(ppdata){
+  eta.pool <- optim(c(1,1),nlogLp_poolCox_IPCW,ppdata = ppdata)$par
+  return(list(est = c(eta.pool)))
+}
+
+
 
 
 ####meta###
@@ -218,11 +266,20 @@ logLp_derivCox <- function(ipdata,eta){
   y_time<-ipdata$time
   y_status<-ipdata$status
   index_1<-which(y_status==TRUE)
+  index<-max(index_1)
   x1<-ipdata$x1
   x2<-ipdata$x2
   x3<-ipdata$z1
   X <- cbind(x1,x2,x3)
-  if(length(index_1)>0){
+  if(length(index_1)==0 || index==1){
+    logL<-0
+    logL_D1<-c(0,0)
+    logL_D2<-matrix(0,2,2)
+    logL_D3_111<-0
+    logL_D3_222<-0
+    logL_D3_112<-0
+    logL_D3_122<-0 
+  }else if( any(x3[1:index]==1) & any(x3[1:index]==0)  ){
     fit_j<-coxph.fit(x=cbind(X[,3]), y=Surv(y_time, y_status),strata = NULL,offset = X[,1:2]%*%eta,
                      control =coxph.control(),rownames = NULL,method="efron")
     if(!is.na(fit_j$coefficients)){
@@ -233,9 +290,13 @@ logLp_derivCox <- function(ipdata,eta){
       derive<-apply(beta, 1, function(x){deriveCox(x,X,index_1) })
       gamma_fit<-gamma[which.min(abs(derive))]
     }
-    beta<-c(eta, gamma_fit)
-    expy <- exp(X%*%beta)
+    beta<-c(eta,gamma_fit)
+    x1<-x1[1:index]
+    x2<-x2[1:index]
+    x3<-x3[1:index]
+    X<-X[1:index,]
     
+    expy <- exp(X%*%beta)
     s_expy<-cumsum(expy)[index_1]
     expy_z<-cumsum(expy*x3)[index_1]
     expy_x1<-cumsum(expy*x1)[index_1]
@@ -342,15 +403,40 @@ logLp_derivCox <- function(ipdata,eta){
     logL_D3_222 <-sum(x3[index_1]*D3_e222-expy_z*D3_e222/s_expy -(expy_p2p2p2+3*expy_p2p22)/(s_expy)+(3*expy_p2*expy_p2p2+
                                                                                                         3*expy_p2*expy_p22)/(s_expy^2) -2*(expy_p2^3)/(s_expy^3) )
   }else{
-    logL<-0
-    logL_D1<-c(0,0)
-    logL_D2<-c(0,0)
-    logL_D2<-matrix(0,2,2)
-    logL_D3_111<-0
-    logL_D3_222<-0
-    logL_D3_112<-0
-    logL_D3_122<-0
+    x1<-x1[1:index]
+    x2<-x2[1:index]
+    X<-cbind(x1,x2)
+    
+    expy <- exp(X%*%eta)
+    s_expy<-cumsum(expy)[index_1]
+    expy_x1<-cumsum(expy*x1)[index_1]
+    expy_x2<-cumsum(expy*x2)[index_1]
+    expy_x1x1<-cumsum(expy*x1*x1)[index_1]
+    expy_x1x2<-cumsum(expy*x1*x2)[index_1]
+    expy_x2x2<-cumsum(expy*x1*x2)[index_1]
+    
+    logL <- sum((X%*%eta)[index_1])-sum(log(s_expy))
+    logL_D1<-c(sum(x1[index_1]-expy_x1/s_expy),sum(x2[index_1]-expy_x2/s_expy))
+    
+    
+    logL_D2_11 <-sum(-expy_x1x1/s_expy+expy_x1*expy_x1/(s_expy^2)) 
+    logL_D2_12 <-sum(-expy_x1x2/s_expy+expy_x1*expy_x2/(s_expy^2)) 
+    logL_D2_22 <-sum(-expy_x2x2/s_expy+expy_x2*expy_x2/(s_expy^2)) 
+    logL_D2 <- matrix(c(logL_D2_11,logL_D2_12,logL_D2_12,logL_D2_22),nrow=2,ncol=2)
+    
+    expy_x1x1x1<-cumsum(expy*x1*x1*x1)[index_1]
+    expy_x1x1x2<-cumsum(expy*x1*x1*x2)[index_1]
+    expy_x1x2x2<-cumsum(expy*x1*x2*x2)[index_1]
+    expy_x2x2x2<-cumsum(expy*x2*x2*x2)[index_1]
+    
+    logL_D3_111<-sum(-expy_x1x1x1/s_expy+ 3*expy_x1*expy_x1x1/(s_expy)^2-2*(expy_x1/s_expy)^3)
+    logL_D3_222<-sum(-expy_x2x2x2/s_expy+ 3*expy_x2*expy_x2x2/(s_expy)^2-2*(expy_x2/s_expy)^3)
+    logL_D3_112<-sum(-expy_x1x1x2/s_expy+ (2*expy_x1*expy_x1x2+expy_x2*expy_x1x1)/(s_expy)^2
+                     -2*(expy_x1^2*expy_x2 )/(s_expy^3))
+    logL_D3_122<-sum(-expy_x1x2x2/s_expy+ (2*expy_x2*expy_x1x2+expy_x1*expy_x2x2)/(s_expy)^2
+                     -2*(expy_x2^2*expy_x1)/(s_expy^3))
   }
+  
   return(list(logLp=logL,logLp_D1=logL_D1,logLp_D2=logL_D2,logLp_D3=c(logL_D3_111,logL_D3_222,logL_D3_112,logL_D3_122)))
 }
 
@@ -469,10 +555,7 @@ PadeEstCRCox<- function(ebar,PadeCoef,alpha=0.05){
   # CR
   coef.CR<-num_vec-denom_vec*c(-eta.pade$value-qchisq(1-alpha,2)/2)
   
-  # CI
-  coef.CI<-num_vec-denom_vec*c(-eta.pade$value-qchisq(1-alpha,1)/2)
-  
-  return(list(Est=PadeEst,CR=coef.CR, CI=coef.CI))
+  return(list(Est=PadeEst,CR=coef.CR))
 }
 
 
@@ -552,46 +635,3 @@ ellipse.plot.padeCox <- function(coef, ebar){
   x <- sqrt(yc2/a)*cos(t)-d/2/a-b/2/a*y
   return(data.frame(x = x+ebar[1],y = y+ebar[2]))
 }
-
-ci.plot.padeCox <- function(coef, ebar){
-  
-  # caculate the CI of the first parameter
-  
-  c = coef[5]
-  b = coef[4]
-  a = coef[6]
-  e = coef[2]
-  d = coef[3]
-  f = coef[1]
-  
-  b_tilde <- c-b^2/4/a
-  e_tilde <- e-d*b/2/a
-  x_tilde <- (d^2/4/a+e_tilde^2/4/b_tilde-f)/b_tilde
-  xmin <- -sqrt(x_tilde)-e_tilde/2/b_tilde
-  xmax <- sqrt(x_tilde)-e_tilde/2/b_tilde
-  lower1 <- min(xmin,xmax)+ebar[1]
-  upper1 <- max(xmin,xmax)+ebar[1]
-  
-  
-  
-  # caculate the CI of the second parameter
-  a = coef[5]
-  b = coef[4]
-  c = coef[6]
-  d = coef[2]
-  e = coef[3]
-  f = coef[1]
-  
-  b_tilde <- c-b^2/4/a
-  e_tilde <- e-d*b/2/a
-  y_tilde <- (d^2/4/a+e_tilde^2/4/b_tilde-f)/b_tilde
-  ymin <- -sqrt(y_tilde)-e_tilde/2/b_tilde
-  ymax <- sqrt(y_tilde)-e_tilde/2/b_tilde
-  lower2 <- min(ymin,ymax)+ebar[2]
-  upper2 <- max(ymin,ymax)+ebar[2]
-  
-  
-  return(list(CI1 = c(lower1,upper1), CI2= c(lower2,upper2)))
-}
-
-
