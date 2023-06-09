@@ -282,7 +282,7 @@ logLp_derivCox <- function(ipdata,eta){
   }else if( any(x3[1:index]==1) & any(x3[1:index]==0)  ){
     fit_j<-coxph.fit(x=cbind(X[,3]), y=Surv(y_time, y_status),strata = NULL,offset = X[,1:2]%*%eta,
                      control =coxph.control(),rownames = NULL,method="efron")
-    if(!is.na(fit_j$coefficients)){
+    if(!is.na(fit_j$coefficients) && fit_j$coefficients > -10 && fit_j$coefficients < 10){
       gamma_fit<-fit_j$coefficients
     }else{
       gamma<-seq(-10,10,0.1)
