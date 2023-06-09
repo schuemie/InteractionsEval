@@ -197,3 +197,39 @@ evaluate2dPadeCox <- function(dataSet, folder) {
     # ls(envir = e)
   }
 }
+
+computeRrsFrom2dPadeCox <- function(folder) {
+  # alpha <- 0.05
+  results <- tibble()
+  padeFiles <- list.files(folder, "PadeArtifactsCox_o")
+  for (padeFile in padeFiles) {
+    load(file.path(folder, padeFile))
+    # Recompute Pade estimate to get CIs:
+    ebar <- ResMeta[[1]]
+    ResPade <- PadeEstCRCox(ebar = ebar, PadeCoef = PadeCoef)
+    coef <- ResPade$CR
+    coef.CI <- ResPade$CI
+    plotCI.pade.ellipse <- ellipse.plot.pade(coef.CI, ebar)
+    plotCI.pade <- ci.plot.pade(coef.CI, ebar)
+    ci <- plotCI.pade
+    outcomeId <- as.numeric(gsub("^PadeArtifactsCox_o", "", gsub(".rdata$", "", padeFile)))
+    result <- tibble(
+      outcomeId = outcomeId,
+      var = paste0("x", c(1, 2)),
+      pooled = ResPool$est,
+      pade = PECR$Est,
+      logRr = PECR$Est
+    )
+    results <- bind_rows(results, result)
+  }
+  library(ggplot2)
+  results$negative <- results$outcomeId != 77
+  breaks <- c(0.1, 0.25, 0.5, 1, 2, 4, 8)
+  ggplot(results, aes(x = exp(pooled), y = exp(pade), color = negative)) +
+    geom_abline(slope = 1) + 
+    geom_point(alpha = 1) +
+    scale_x_log10(breaks = breaks, limits = c(0.1, 10)) +
+    scale_y_log10(breaks = breaks, limits = c(0.1, 10)) +
+    facet_grid(~var)
+  ggsave(file.path(folder, "PadeVsPooledCox.png"))
+}
