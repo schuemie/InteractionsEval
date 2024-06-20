@@ -109,7 +109,7 @@ computeRrsFrom2dPade <- function(folder) {
     scale_x_log10(breaks = breaks, limits = c(0.1, 10)) +
     scale_y_log10(breaks = breaks, limits = c(0.1, 10)) +
     facet_grid(~var)
-  ggsave(file.path(folder, "PadeVsPooledPoisson.png"))
+  ggsave(file.path(folder, "PadeVsPooledPoisson.png"), width = 7, height = 3.5)
   ncs1 <- results %>%
     filter(var == "x1" & negative) 
   ncs2 <- results %>%
@@ -231,5 +231,5 @@ computeRrsFrom2dPadeCox <- function(folder) {
     scale_x_log10(breaks = breaks, limits = c(0.1, 10)) +
     scale_y_log10(breaks = breaks, limits = c(0.1, 10)) +
     facet_grid(~var)
-  ggsave(file.path(folder, "PadeVsPooledCox.png"))
+  ggsave(file.path(folder, "PadeVsPooledCox.png"), width = 7, height = 3.5)
 }
