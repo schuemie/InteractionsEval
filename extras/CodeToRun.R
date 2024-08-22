@@ -36,3 +36,21 @@ dataSet <- readRDS(file.path(rootFolder, "DataSet.rds"))
 
 evaluate2dPadePoisson(dataSet = dataSet, folder = rootFolder)
 evaluate2dPadeevaluate2dPadeCox(dataSet = dataSet, folder = rootFolder)
+
+# For Marc:
+library(dplyr)
+
+dataSet <- dataSet %>%
+  filter(analysisId == 4) %>%
+  select(-time, -analysisId) %>%
+  mutate(y = y == 1)
+saveRDS(dataSet,  file.path(rootFolder, "InteractionDataForMarc.rds"))
+head(dataSet)
+
+library(Cyclops)
+library(survival)
+subset <- dataSet %>%
+  filter(siteId == 1, outcomeId == 77)
+cyclopsData <- createCyclopsData(Surv(survivalTime, y) ~ treatment + subgroup + subgroup*treatment + strata(stratumId), modelType = "cox", data = subset)
+fit <- fitCyclopsModel(cyclopsData)
+coef(fit)
